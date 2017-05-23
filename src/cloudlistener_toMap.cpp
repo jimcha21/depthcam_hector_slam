@@ -72,7 +72,6 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 
 	pV_pub.publish(v_);
 
-
 }
 
 int main(int argc, char** argv)

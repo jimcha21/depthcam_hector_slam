@@ -28,6 +28,8 @@
 #include <opencv2/core/core.hpp>
 #include "slammin/pointVector3d.h"
 #include "slammin/point3d.h"
+#include "nav_msgs/OccupancyGrid.h"
+#include "nav_msgs/GetMap.h"
 
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
@@ -62,20 +64,46 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 	slammin::pointVector3d matched_v_;
 	slammin::point3d matched_p_;
 	int iters=0;
-	for (int i = 0; i < point_v_.vec3d.size(); ++i)
+	// for (int i = 0; i < point_v_.vec3d.size(); ++i)
+	// {
+	// 	for (int j = 0; j < mapV.vec3d.size(); ++j)
+	// 	{
+	// 		iters++;
+	// 		if ((std::abs(mapV.vec3d[j].x-point_v_.vec3d[i].x)<=0.1) && (std::abs(mapV.vec3d[j].y-point_v_.vec3d[i].y)<=0.1)){
+	// 			//matched_p_=point_v_.vec3d[i];
+	// 			matched_p_.x=div(point_v_.vec3d[i].posIncloud,640).rem; //matched_p_.x=point_v_.vec3d[i].x;
+	// 			matched_p_.y=div(point_v_.vec3d[i].posIncloud,640).quot;//matched_p_.y=point_v_.vec3d[i].y;
+	// 			matched_p_.z=point_v_.vec3d[i].z; //height category 
+	// 			matched_p_.posIncloud=point_v_.vec3d[i].posIncloud;
+	// 			matched_v_.vec3d.push_back(matched_p_);
+				
+	// 			j=mapV.vec3d.size();
+	// 		}
+
+	// 	}
+
+	// }
+
+	int thres=10;
+	for (int i = 0; i < mapV.vec3d.size(); ++i)
 	{
-		for (int j = 0; j < mapV.vec3d.size(); ++j)
+		int forthis=0;
+		for (int j = 0; j < point_v_.vec3d.size(); ++j)
 		{
 			iters++;
-			if ((std::abs(mapV.vec3d[j].x-point_v_.vec3d[i].x)<=0.1) && (std::abs(mapV.vec3d[j].y-point_v_.vec3d[i].y)<=0.1)){
+			
+			if ((std::abs(mapV.vec3d[i].x-point_v_.vec3d[j].x)<=0.1) && (std::abs(mapV.vec3d[i].y-point_v_.vec3d[j].y)<=0.1)){
 				//matched_p_=point_v_.vec3d[i];
-				matched_p_.x=div(point_v_.vec3d[i].posIncloud,640).rem; //matched_p_.x=point_v_.vec3d[i].x;
-				matched_p_.y=div(point_v_.vec3d[i].posIncloud,640).quot;//matched_p_.y=point_v_.vec3d[i].y;
-				matched_p_.z=point_v_.vec3d[i].z; //height category 
-				matched_p_.posIncloud=point_v_.vec3d[i].posIncloud;
+				matched_p_.x=div(point_v_.vec3d[j].posIncloud,640).rem; //matched_p_.x=point_v_.vec3d[i].x;
+				matched_p_.y=div(point_v_.vec3d[j].posIncloud,640).quot;//matched_p_.y=point_v_.vec3d[i].y;
+				matched_p_.z=point_v_.vec3d[j].z; //height category 
+				matched_p_.posIncloud=point_v_.vec3d[j].posIncloud;
 				matched_v_.vec3d.push_back(matched_p_);
-				
-				j=mapV.vec3d.size();
+				forthis++;				
+			}
+
+			if(forthis>thres){
+				j=point_v_.vec3d.size();
 			}
 
 		}
@@ -122,15 +150,51 @@ void callback(const slammin::pointVector3d::ConstPtr& data)
 	mapV=*data;
 }
 
+void extract_map(const nav_msgs::OccupancyGrid::ConstPtr& map)
+{
+	ROS_INFO("Received new map...");
+	slammin::pointVector3d map_vec_in2d;
+	int a;
+	for (int i = 0; i <10 ; ++i) //map->info.height*map->info.width
+	{
+
+		if(map->data[i]!=-1){
+			ROS_INFO("%d",map->data[i]);
+		}
+	}
+	
+}
+
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "slammin_matcher");
   ros::NodeHandle nh;
 
-  sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
-  map_sub= nh.subscribe<slammin::pointVector3d> ("/mapV", 1, callback);
-  cam_sub= nh.subscribe<sensor_msgs::Image> ("/camera/rgb/image_raw", 1, imageCb);
+  // sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
+  // map_sub= nh.subscribe<slammin::pointVector3d> ("/mapV", 1, callback);
+  //map_sub= nh.subscribe<nav_msgs::OccupancyGrid> ("/map", 1, extract_map);
+  // cam_sub= nh.subscribe<sensor_msgs::Image> ("/camera/rgb/image_raw", 1, imageCb);
   //pV_pub = nh.advertise<slammin::pointVector3d> ("/slammin_pointVector3d", 1);
+
+
+  ros::ServiceClient client = nh.serviceClient<nav_msgs::GetMap>("dynamic_map");
+  nav_msgs::GetMap srv;
+  if (client.call(srv))
+  {
+    nav_msgs::OccupancyGrid map= srv.response.map;
+    for (int i = 0; i <map.info.height*map.info.width ; ++i) //map->info.height*map->info.width
+	{
+
+		if(map.data[i]!=-1){
+			ROS_INFO("%d",map.data[i]);
+		}
+	}
+  }
+  else
+  {
+    ROS_ERROR("Failed to call service add_two_ints");
+    return 1;
+  }
 
   ros::spin();
   return 0; 

@@ -36,10 +36,13 @@ typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 
 //ros::Publisher pV_pub;
 ros::Subscriber sub,map_sub,cam_sub;
+ros::ServiceClient client;
+nav_msgs::OccupancyGrid map_;
 tf::TransformListener *tf_listener; 
+
 slammin::pointVector3d mapV;
 slammin::pointVector3d point_v_;
-cv_bridge::CvImagePtr cv_ptr;
+
 
 void vector_data(const slammin::pointVector3d::ConstPtr& data)
 {
@@ -49,6 +52,8 @@ void vector_data(const slammin::pointVector3d::ConstPtr& data)
 
 void imageCb(const sensor_msgs::ImageConstPtr& msg)
   {
+  	cv_bridge::CvImagePtr cv_ptr;
+  	
     try
     {
       cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
@@ -84,7 +89,12 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 
 	// }
 
-	int thres=10;
+	int thres=10000;
+	if(mapV.vec3d.size()>0){
+		ROS_INFO("tha ksekinisei %d kai me point 3 %d",mapV.vec3d.size(),point_v_.vec3d.size());
+	}else{
+		ROS_INFO("bnope");
+	}
 	for (int i = 0; i < mapV.vec3d.size(); ++i)
 	{
 		int forthis=0;
@@ -92,10 +102,10 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 		{
 			iters++;
 			
-			if ((std::abs(mapV.vec3d[i].x-point_v_.vec3d[j].x)<=0.1) && (std::abs(mapV.vec3d[i].y-point_v_.vec3d[j].y)<=0.1)){
+			if ((std::abs(mapV.vec3d[i].x-point_v_.vec3d[j].x)<=0.3) && (std::abs(mapV.vec3d[i].y-point_v_.vec3d[j].y)<=0.3)){
 				//matched_p_=point_v_.vec3d[i];
-				matched_p_.x=div(point_v_.vec3d[j].posIncloud,640).rem; //matched_p_.x=point_v_.vec3d[i].x;
-				matched_p_.y=div(point_v_.vec3d[j].posIncloud,640).quot;//matched_p_.y=point_v_.vec3d[i].y;
+				matched_p_.x=div(point_v_.vec3d[j].posIncloud,160).rem; //matched_p_.x=point_v_.vec3d[i].x;
+				matched_p_.y=div(point_v_.vec3d[j].posIncloud,160).quot;//matched_p_.y=point_v_.vec3d[i].y;
 				matched_p_.z=point_v_.vec3d[j].z; //height category 
 				matched_p_.posIncloud=point_v_.vec3d[j].posIncloud;
 				matched_v_.vec3d.push_back(matched_p_);
@@ -167,35 +177,45 @@ void extract_map(const nav_msgs::OccupancyGrid::ConstPtr& map)
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "slammin_matcher");
-  ros::NodeHandle nh;
+	ros::init(argc, argv, "slammin_matcher");
+	ros::NodeHandle nh;
+	while(nh.ok()){ 	
 
-  // sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
-  // map_sub= nh.subscribe<slammin::pointVector3d> ("/mapV", 1, callback);
-  //map_sub= nh.subscribe<nav_msgs::OccupancyGrid> ("/map", 1, extract_map);
-  // cam_sub= nh.subscribe<sensor_msgs::Image> ("/camera/rgb/image_raw", 1, imageCb);
-  //pV_pub = nh.advertise<slammin::pointVector3d> ("/slammin_pointVector3d", 1);
+	sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
+	// map_sub= nh.subscribe<slammin::pointVector3d> ("/mapV", 1, callback);
+	//map_sub= nh.subscribe<nav_msgs::OccupancyGrid> ("/map", 1, extract_map);
+	cam_sub= nh.subscribe<sensor_msgs::Image> ("/camera/rgb/image_raw", 1, imageCb);
+	//pV_pub = nh.advertise<slammin::pointVector3d> ("/slammin_pointVector3d", 1);
 
-
-  ros::ServiceClient client = nh.serviceClient<nav_msgs::GetMap>("dynamic_map");
-  nav_msgs::GetMap srv;
-  if (client.call(srv))
-  {
-    nav_msgs::OccupancyGrid map= srv.response.map;
-    for (int i = 0; i <map.info.height*map.info.width ; ++i) //map->info.height*map->info.width
+	client = nh.serviceClient<nav_msgs::GetMap>("dynamic_map");
+	nav_msgs::GetMap srv;
+	mapV.vec3d.clear(); //clear previously cached map data..
+	if (client.call(srv))
 	{
+	map_= srv.response.map;
+	for (int i = 0; i <map_.info.height*map_.info.width ; ++i) //map_->info.height*map_->info.width
+	{
+		slammin::point3d p_;
 
-		if(map.data[i]!=-1){
-			ROS_INFO("%d",map.data[i]);
+		//recostruction of the 2d map in world coordinates..
+		if(map_.data[i]==100){
+			// /ROS_INFO("%d",map_.data[i]);
+			p_.x=(div(i,map_.info.height).rem)*map_.info.resolution + map_.info.origin.position.x;
+			p_.y=(div(i,map_.info.height).quot)*map_.info.resolution + map_.info.origin.position.y;
+			p_.z=0;
+			p_.posIncloud=0;
+			mapV.vec3d.push_back(p_);
 		}
 	}
+	}
+	else
+	{
+	ROS_ERROR("Failed to call service add_two_ints");
+	return 1;
+	}
+	ROS_INFO("matched size  %d",mapV.vec3d.size());
+	  ros::spin();
   }
-  else
-  {
-    ROS_ERROR("Failed to call service add_two_ints");
-    return 1;
-  }
-
-  ros::spin();
+ 
   return 0; 
 }

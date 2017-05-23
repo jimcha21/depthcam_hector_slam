@@ -93,7 +93,7 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 	if(mapV.vec3d.size()>0){
 		ROS_INFO("tha ksekinisei %d kai me point 3 %d",mapV.vec3d.size(),point_v_.vec3d.size());
 	}else{
-		ROS_INFO("bnope");
+		ROS_INFO("nope");
 	}
 	for (int i = 0; i < mapV.vec3d.size(); ++i)
 	{

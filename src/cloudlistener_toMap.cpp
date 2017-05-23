@@ -1,47 +1,29 @@
+// some libs need to be removed
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/transforms.h>
 #include <boost/foreach.hpp>
-//#include "sensor_msgs/PointCloud2.h"
-//#include "sensor_msgs/PointField.h"
-#include "geometry_msgs/Point.h"
-#include <vector>
 #include <pcl_ros/impl/transforms.hpp>
 #include <tf/transform_listener.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/conversions.h>
 #include <stdlib.h>  
-#include <sensor_msgs/Image.h>
-//pcl::toROSMsg
 #include <pcl/io/pcd_io.h>
-//stl stuff
-#include <string>
-#include <image_transport/image_transport.h>
-#include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <pcl/visualization/cloud_viewer.h>
-#include <cmath>      
-#include <opencv2/core/core.hpp>
-
+#include <pcl/visualization/cloud_viewer.h>  
 #include "slammin/pointVector3d.h"
 #include "slammin/point3d.h"
 
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
-//typedef geometry_msgs::Point32 VP;
-//typedef sensor_msgs::PointCloud2 PointCloud;
 
-ros::Publisher tf_pub;
-ros::Publisher ima,gridis;
+ros::Publisher pV_pub;
 ros::Subscriber sub ;
 tf::TransformListener *tf_listener; 
-
-sensor_msgs::Image image_; //cache the image message
-
 
 void callback(const PointCloud::ConstPtr& pcl_in)
 {
@@ -64,16 +46,33 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 	//ROS_INFO("fetched pointcloud");
 	pcl_ros::transformPointCloud("/world", *pcl_in, pcl_out, *tf_listener);
 	//tf_pub.publish(pcl_out);
-	printf("irthan %d\n",pcl_out.points.size() );
+	//printf("fetched %d points\n",pcl_out.points.size() );
+	
 	slammin::pointVector3d v_;
+	slammin::point3d p_;
+
+	int howmanynan=0;
 	for (int i = 0; i < pcl_out.points.size(); ++i)
 	{
-		if(!isnan(pcl_out.points[i].z)){
-			printf("helo\n");
-		}
+		if(!isnan(pcl_out.points[i].z)&&pcl_out.points[i].z>0.1){ //~~~>add launch parameter here for min heigth
+			p_.x=pcl_out.points[i].x;
+			p_.y=pcl_out.points[i].y;
+			p_.z=pcl_out.points[i].z;
+			v_.vec3d.push_back(p_);
+		}else if(isnan(pcl_out.points[i].z)) howmanynan++;
+
 	}
-	 
-	
+
+	// for (int i = 0; i < v_.vec3d.size(); ++i)
+	// {
+	// 	if(isnan(v_.vec3d[i].x)||isnan(v_.vec3d[i].y)||isnan(v_.vec3d[i].z)){
+	// 		printf("nan er\n");
+	// 	}
+	// }
+
+	pV_pub.publish(v_);
+
+
 }
 
 int main(int argc, char** argv)
@@ -82,27 +81,23 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
   tf_listener    = new tf::TransformListener();
   sub= nh.subscribe<PointCloud>("/camera/depth/points", 1, callback);
+  pV_pub = nh.advertise<slammin::pointVector3d> ("/slammin_pointVector3d", 1);
 
-  //ros::Subscriber sub2 = nh.subscribe<pcl_ros::Vec>("/mapV", 1, callback2);
- 
-  tf_pub = nh.advertise<PointCloud> ("tf_points2", 1);
-  // ima = nh.advertise<sensor_msgs::Image> ("ima", 1);
-  // gridis = nh.advertise<pcl_ros::Vec>("for_grid_map", 1);
+// ros::Rate rate(10.0);
+// while (nh.ok()){
+// 	tf::StampedTransform transform;
+// 	try {
+// 		tf_listener->waitForTransform("/world", "/camera_depth_frame", ros::Time(0), ros::Duration(1.0) );
+// 		//tf_listener->lookupTransform("/world", "/camera_depth_frame", ros::Time(0), transform);
+// 	} catch (tf::TransformException ex) {
+// 		ROS_ERROR("%s",ex.what());
+// 		continue;
+// 	}
+// 	sub= nh.subscribe<PointCloud>("/camera/depth/points", 1, callback);
+// 	rate.sleep();
+// }
 
-	// ros::Rate rate(10.0);
-	// while (nh.ok()){
-	// 	tf::StampedTransform transform;
-	// 	try {
-	// 		tf_listener->waitForTransform("/world", "/camera_depth_frame", ros::Time(0), ros::Duration(1.0) );
-	// 		//tf_listener->lookupTransform("/world", "/camera_depth_frame", ros::Time(0), transform);
-	// 	} catch (tf::TransformException ex) {
-	// 		ROS_ERROR("%s",ex.what());
-	// 		continue;
-	// 	}
-	// 	sub= nh.subscribe<PointCloud>("/camera/depth/points", 1, callback);
-	// 	rate.sleep();
-	// }
-    //return 0; 
   ros::spin();
+  return 0; 
 }
 

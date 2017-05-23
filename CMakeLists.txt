@@ -7,11 +7,39 @@ project(slammin)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
+find_package(cmake_modules REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system filesystem thread)
+find_package(Eigen REQUIRED)
+find_package(PCL REQUIRED)
+find_package( OpenCV REQUIRED )
 find_package(catkin REQUIRED COMPONENTS
-  pcl_ros
-  roscpp
-  rospy
+	pcl_ros
+	roscpp
+	rospy
+	std_msgs
+	tf
+	cv_bridge
+	image_transport
+	message_generation
+)
+
+add_message_files(
+   FILES
+   Map_point.msg
+)
+
+generate_messages(
+  DEPENDENCIES
   std_msgs
+  pcl_ros
+)
+
+include_directories(include
+  ${Boost_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS}
+  ${Eigen_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 ## System dependencies are found with CMake's conventions
@@ -134,7 +162,8 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/slammin_node.cpp)
+ add_executable(${PROJECT_NAME}_node src/kati.cpp)
+target_link_libraries(${PROJECT_NAME}_node ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${Eigen_LIBRARIES} ${PCL_LIBRARIES})
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -198,3 +227,6 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+install(DIRECTORY launch/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+)

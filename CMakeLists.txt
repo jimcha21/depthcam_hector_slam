@@ -61,6 +61,9 @@ target_link_libraries(${PROJECT_NAME}_node ${Boost_LIBRARIES} ${catkin_LIBRARIES
 add_executable(cloudlistener_toMap src/cloudlistener_toMap.cpp)
 target_link_libraries(cloudlistener_toMap ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${Eigen_LIBRARIES} ${PCL_LIBRARIES})
 
+add_executable(slammin_matcher src/slammin_matcher.cpp)
+target_link_libraries(slammin_matcher ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${Eigen_LIBRARIES} ${PCL_LIBRARIES})
+
 
 install(DIRECTORY launch/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch

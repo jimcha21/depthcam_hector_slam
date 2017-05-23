@@ -1,4 +1,4 @@
-// some libs need to be removed
+// some libs need to be removed**
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
@@ -12,8 +12,6 @@
 #include <stdlib.h>  
 #include <pcl/io/pcd_io.h>
 #include <sensor_msgs/image_encodings.h>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
 #include <pcl/visualization/cloud_viewer.h>  
 #include "slammin/pointVector3d.h"
 #include "slammin/point3d.h"
@@ -58,6 +56,7 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 			p_.x=pcl_out.points[i].x;
 			p_.y=pcl_out.points[i].y;
 			p_.z=pcl_out.points[i].z;
+			p_.posIncloud=i;
 			v_.vec3d.push_back(p_);
 		}else if(isnan(pcl_out.points[i].z)) howmanynan++;
 

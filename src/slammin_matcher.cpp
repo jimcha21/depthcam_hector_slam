@@ -33,6 +33,7 @@
 #include "geometry_msgs/Pose.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include <tf/transform_datatypes.h>
+
 #define PI 3.14159265
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
@@ -44,8 +45,9 @@ ros::ServiceClient client;
 nav_msgs::OccupancyGrid map_;
 tf::TransformListener *tf_listener; 
 geometry_msgs::Pose pose_;
-slammin::pointVector3d mapV;
+slammin::pointVector3d mapV,mapC;
 slammin::pointVector3d point_v_;
+float res=0.25;
 
 
 void vector_data(const slammin::pointVector3d::ConstPtr& data)
@@ -54,9 +56,65 @@ void vector_data(const slammin::pointVector3d::ConstPtr& data)
 	point_v_=*data;
 }
 
-void map_checks(float angle,float pos_x,float pos_y,float res){
-	float mprostatoux=cos(angle)*pose_.position.x-sin(angle)*pose_.position.y+res;
-	float mprostatouy=sin(angle)*pose_.position.x+cos(angle)*pose_.position.y+res;
+void mapgrids_onRange_rec(float angle,float pos_x,float pos_y,float res){
+
+	float frontPos_x,frontPos_y,x_fr_res,y_fr_res,x_lef_res,x_rig_res,y_lef_res,y_rig_res;
+	//recursion break;
+	if(mapC.vec3d.size()>2){
+		return;
+	}
+
+	//mporei na ginei kai ektos anadromis den alazei
+	if(angle>22.5&&angle<=67.5){ //45 deg
+		x_fr_res=res;y_fr_res=res;  x_lef_res=0;y_lef_res=res;  x_rig_res=res;y_rig_res=0;
+	}else if(angle>67.5&&angle<=112.5){ //90
+		x_fr_res=0;y_fr_res=res;  x_lef_res=-res;y_lef_res=res;  x_rig_res=res;y_rig_res=res;
+	}else if(angle>112.5&&angle<=157.5){ //135
+		x_fr_res=-res;y_fr_res=res;  x_lef_res=-res;y_lef_res=0;  x_rig_res=0;y_rig_res=res;
+	}else if(angle>157.5&&angle<=202.5){ //180
+		x_fr_res=-res;y_fr_res=0;  x_lef_res=-res;y_lef_res=-res;  x_rig_res=-res;y_rig_res=res;
+	}else if(angle>202.5&&angle<=247.5){ //225
+		x_fr_res=-res;y_fr_res=-res;  x_lef_res=0;y_lef_res=-res;  x_rig_res=-res;y_rig_res=0;
+	}else if(angle>247.5&&angle<=292.5){ //270
+		x_fr_res=0;y_fr_res=-res;  x_lef_res=res;y_lef_res=-res;  x_rig_res=-res;y_rig_res=-res;
+	}else if(angle>292.5&&angle<=337.5){ //315
+		x_fr_res=res;y_fr_res=-res;  x_lef_res=res;y_lef_res=0;  x_rig_res=0;y_rig_res=-res;
+	}else if(angle>337.5||angle<=22.5){ //360-0
+		x_fr_res=res;y_fr_res=0;  x_lef_res=res;y_lef_res=res;  x_rig_res=res;y_rig_res=-res;
+	}
+
+	// frontPos_x=cos(angle*PI/180)*pose_.position.x-sin(angle*PI/180)*pose_.position.y+x_fr_res;
+	// frontPos_y=sin(angle*PI/180)*pose_.position.x+cos(angle*PI/180)*pose_.position.y+y_fr_res;
+	frontPos_x=pose_.position.x+x_fr_res;
+	frontPos_y=pose_.position.y+y_fr_res;
+
+	float index=((0-map_.info.origin.position.x)/map_.info.resolution)*map_.info.height+((0-map_.info.origin.position.y)/map_.info.resolution);
+	//(frontPos_x/map_.info.resolution)*map_.info.height+(frontPos_y/map_.info.resolution);
+	ROS_INFO("the index is %f with coords %f %f",index,frontPos_x,frontPos_y);
+	// if(map_.data[index]==100){
+
+	// }
+	//mapgrids_onRange_rec(angle,front_x,front_y,res);
+//ROS_INFO("me cos %f sin %f einai sto %f %f kai tha paei sto %f %f ",cos(angle),sin(angle),pose_.position.x,pose_.position.y,mprostatoux,mprostatouy);
+
+	for (int i = 0; i <map_.info.height*map_.info.width ; ++i) //map_->info.height*map_->info.width
+	{
+		slammin::point3d p_;
+
+		//recostruction of the 2d map in world coordinates..
+		if(map_.data[i]==100){
+			// /ROS_INFO("%d",map_.data[i]);
+			p_.x=(div(i,map_.info.height).rem)*map_.info.resolution + map_.info.origin.position.x;
+			p_.y=(div(i,map_.info.height).quot)*map_.info.resolution + map_.info.origin.position.y;
+			float index=((float)((float)p_.y-(float)map_.info.origin.position.y)/(float)map_.info.resolution)*(float)map_.info.height+((float)((float)p_.x-(float)map_.info.origin.position.x)/(float)map_.info.resolution);
+			float da=(float)(((float)(4-3)/(float)2)*(float)4);
+			ROS_INFO("see that %f %d %f",index,i,da);
+			//p_.z=0;
+			//p_.posIncloud=0; //in mapV is useless, so it will be used in the recursive func
+			//mapV.vec3d.push_back(p_);
+		}
+	}
+	return;
 }
 
 void imageCb(const sensor_msgs::ImageConstPtr& msg)
@@ -104,24 +162,18 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 	tf::Matrix3x3 m(q);
 	double roll, pitch, yaw;
 	m.getRPY(roll, pitch, yaw);
-	//std::cout << "Roll: " << roll << ", Pitch: " << pitch << ", Yaw: " << yaw << std::endl;
-	ROS_INFO("the four clues %f %f %f ",roll,pitch,yaw);
+
 	float angle;
 	angle=(180*std::abs(yaw))/3.10;
 	if(yaw<0){
 		angle=angle-180;		
 		angle=180+std::abs(angle);
 	}
-	if(angle-45<0){
-		angle=360+angle-45;
-	}else angle=angle-45;
 	ROS_INFO("angle %f",angle);
-	//map_checks(angle,pose_.position.x,pose_.position.y,0.25);
-	float res=0.25;
-	float mprostatoux=cos(angle * PI / 180.0)*pose_.position.x-sin(angle * PI / 180.0)*pose_.position.y+res;
-	float mprostatouy=sin(angle * PI / 180.0)*pose_.position.x+cos(angle * PI / 180.0)*pose_.position.y+res;
 
-	ROS_INFO("me cos %f sin %f einai sto %f %f kai tha paei sto %f %f ",cos(angle),sin(angle),pose_.position.x,pose_.position.y,mprostatoux,mprostatouy);
+	
+	mapgrids_onRange_rec(angle,pose_.position.x,pose_.position.y,res);
+	
 	// int thres=10000;
 	// if(mapV.vec3d.size()>0){
 	// 	ROS_INFO("tha ksekinisei %d kai me point 3 %d",mapV.vec3d.size(),point_v_.vec3d.size());
@@ -222,43 +274,42 @@ int main(int argc, char** argv)
 	ros::init(argc, argv, "slammin_matcher");
 	ros::NodeHandle nh;
 	while(nh.ok()){ 	
+		sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
+		pose_sub=nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/poseupdate", 1, get_pose_);
+		// map_sub= nh.subscribe<slammin::pointVector3d> ("/mapV", 1, callback);
+		//map_sub= nh.subscribe<nav_msgs::OccupancyGrid> ("/map", 1, extract_map);
+		cam_sub= nh.subscribe<sensor_msgs::Image> ("/camera/rgb/image_raw", 1, imageCb);
+		//pV_pub = nh.advertise<slammin::pointVector3d> ("/slammin_pointVector3d", 1);
 
-	sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
-	pose_sub=nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/poseupdate", 1, get_pose_);
-	// map_sub= nh.subscribe<slammin::pointVector3d> ("/mapV", 1, callback);
-	//map_sub= nh.subscribe<nav_msgs::OccupancyGrid> ("/map", 1, extract_map);
-	cam_sub= nh.subscribe<sensor_msgs::Image> ("/camera/rgb/image_raw", 1, imageCb);
-	//pV_pub = nh.advertise<slammin::pointVector3d> ("/slammin_pointVector3d", 1);
+		client = nh.serviceClient<nav_msgs::GetMap>("dynamic_map");
+		nav_msgs::GetMap srv;
+		mapV.vec3d.clear(); //clear previously cached map data..
+		if (client.call(srv))
+		{
+			map_= srv.response.map;		
+			// for (int i = 0; i <map_.info.height*map_.info.width ; ++i) //map_->info.height*map_->info.width
+			// {
+			// 	slammin::point3d p_;
 
-	client = nh.serviceClient<nav_msgs::GetMap>("dynamic_map");
-	nav_msgs::GetMap srv;
-	mapV.vec3d.clear(); //clear previously cached map data..
-	if (client.call(srv))
-	{
-	map_= srv.response.map;
-	for (int i = 0; i <map_.info.height*map_.info.width ; ++i) //map_->info.height*map_->info.width
-	{
-		slammin::point3d p_;
-
-		//recostruction of the 2d map in world coordinates..
-		if(map_.data[i]==100){
-			// /ROS_INFO("%d",map_.data[i]);
-			p_.x=(div(i,map_.info.height).rem)*map_.info.resolution + map_.info.origin.position.x;
-			p_.y=(div(i,map_.info.height).quot)*map_.info.resolution + map_.info.origin.position.y;
-			p_.z=0;
-			p_.posIncloud=0;
-			mapV.vec3d.push_back(p_);
+			// 	//recostruction of the 2d map in world coordinates..
+			// 	if(map_.data[i]==100){
+			// 		// /ROS_INFO("%d",map_.data[i]);
+			// 		p_.x=(div(i,map_.info.height).rem)*map_.info.resolution + map_.info.origin.position.x;
+			// 		p_.y=(div(i,map_.info.height).quot)*map_.info.resolution + map_.info.origin.position.y;
+			// 		p_.z=0;
+			// 		p_.posIncloud=0; //in mapV is useless, so it will be used in the recursive func
+			// 		mapV.vec3d.push_back(p_);
+			// 	}
+			// }
 		}
-	}
-	}
-	else
-	{
-	ROS_ERROR("Failed to call service add_two_ints");
-	return 1;
-	}
-	ROS_INFO("matched size  %d",mapV.vec3d.size());
-	  ros::spin();
-  }
+		else
+		{
+			ROS_ERROR("Failed to fetch the map");
+			return 1;
+		}
+		//ROS_INFO("matched size  %d",mapV.vec3d.size());
+		ros::spin();
+  	}
  
   return 0; 
 }

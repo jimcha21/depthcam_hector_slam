@@ -30,16 +30,20 @@
 #include "slammin/point3d.h"
 #include "nav_msgs/OccupancyGrid.h"
 #include "nav_msgs/GetMap.h"
-
+#include "geometry_msgs/Pose.h"
+#include "geometry_msgs/PoseWithCovarianceStamped.h"
+#include <tf/transform_datatypes.h>
+#define PI 3.14159265
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 
+
 //ros::Publisher pV_pub;
-ros::Subscriber sub,map_sub,cam_sub;
+ros::Subscriber sub,map_sub,cam_sub,pose_sub;
 ros::ServiceClient client;
 nav_msgs::OccupancyGrid map_;
 tf::TransformListener *tf_listener; 
-
+geometry_msgs::Pose pose_;
 slammin::pointVector3d mapV;
 slammin::pointVector3d point_v_;
 
@@ -48,6 +52,11 @@ void vector_data(const slammin::pointVector3d::ConstPtr& data)
 {
 	//ROS_INFO("received point_v_");
 	point_v_=*data;
+}
+
+void map_checks(float angle,float pos_x,float pos_y,float res){
+	float mprostatoux=cos(angle)*pose_.position.x-sin(angle)*pose_.position.y+res;
+	float mprostatouy=sin(angle)*pose_.position.x+cos(angle)*pose_.position.y+res;
 }
 
 void imageCb(const sensor_msgs::ImageConstPtr& msg)
@@ -89,68 +98,86 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 
 	// }
 
-	int thres=10000;
-	if(mapV.vec3d.size()>0){
-		ROS_INFO("tha ksekinisei %d kai me point 3 %d",mapV.vec3d.size(),point_v_.vec3d.size());
-	}else{
-		ROS_INFO("nope");
+
+// ...
+	tf::Quaternion q(pose_.orientation.x,pose_.orientation.y,pose_.orientation.z,pose_.orientation.w);
+	tf::Matrix3x3 m(q);
+	double roll, pitch, yaw;
+	m.getRPY(roll, pitch, yaw);
+	//std::cout << "Roll: " << roll << ", Pitch: " << pitch << ", Yaw: " << yaw << std::endl;
+	ROS_INFO("the four clues %f %f %f ",roll,pitch,yaw);
+	float angle;
+	angle=(180*std::abs(yaw))/3.10;
+	if(yaw<0){
+		angle=angle-180;		
+		angle=180+std::abs(angle);
 	}
-	for (int i = 0; i < mapV.vec3d.size(); ++i)
-	{
-		int forthis=0;
-		for (int j = 0; j < point_v_.vec3d.size(); ++j)
-		{
-			iters++;
+	if(angle-45<0){
+		angle=360+angle-45;
+	}else angle=angle-45;
+	ROS_INFO("angle %f",angle);
+	//map_checks(angle,pose_.position.x,pose_.position.y,0.25);
+	float res=0.25;
+	float mprostatoux=cos(angle * PI / 180.0)*pose_.position.x-sin(angle * PI / 180.0)*pose_.position.y+res;
+	float mprostatouy=sin(angle * PI / 180.0)*pose_.position.x+cos(angle * PI / 180.0)*pose_.position.y+res;
+
+	ROS_INFO("me cos %f sin %f einai sto %f %f kai tha paei sto %f %f ",cos(angle),sin(angle),pose_.position.x,pose_.position.y,mprostatoux,mprostatouy);
+	// int thres=10000;
+	// if(mapV.vec3d.size()>0){
+	// 	ROS_INFO("tha ksekinisei %d kai me point 3 %d",mapV.vec3d.size(),point_v_.vec3d.size());
+	// }else{
+	// 	ROS_INFO("nope");
+	// }
+	// for (int i = 0; i < mapV.vec3d.size(); ++i)
+	// {
+	// 	int forthis=0;
+	// 	for (int j = 0; j < point_v_.vec3d.size(); ++j)
+	// 	{
+	// 		iters++;
 			
-			if ((std::abs(mapV.vec3d[i].x-point_v_.vec3d[j].x)<=0.3) && (std::abs(mapV.vec3d[i].y-point_v_.vec3d[j].y)<=0.3)){
-				//matched_p_=point_v_.vec3d[i];
-				matched_p_.x=div(point_v_.vec3d[j].posIncloud,160).rem; //matched_p_.x=point_v_.vec3d[i].x;
-				matched_p_.y=div(point_v_.vec3d[j].posIncloud,160).quot;//matched_p_.y=point_v_.vec3d[i].y;
-				matched_p_.z=point_v_.vec3d[j].z; //height category 
-				matched_p_.posIncloud=point_v_.vec3d[j].posIncloud;
-				matched_v_.vec3d.push_back(matched_p_);
-				forthis++;				
-			}
+	// 		if ((std::abs(mapV.vec3d[i].x-point_v_.vec3d[j].x)<=0.3) && (std::abs(mapV.vec3d[i].y-point_v_.vec3d[j].y)<=0.3)){
+	// 			//matched_p_=point_v_.vec3d[i];
+	// 			matched_p_.x=div(point_v_.vec3d[j].posIncloud,160).rem; //matched_p_.x=point_v_.vec3d[i].x;
+	// 			matched_p_.y=div(point_v_.vec3d[j].posIncloud,160).quot;//matched_p_.y=point_v_.vec3d[i].y;
+	// 			matched_p_.z=point_v_.vec3d[j].z; //height category 
+	// 			matched_p_.posIncloud=point_v_.vec3d[j].posIncloud;
+	// 			matched_v_.vec3d.push_back(matched_p_);
+	// 			forthis++;				
+	// 		}
 
-			if(forthis>thres){
-				j=point_v_.vec3d.size();
-			}
+	// 		if(forthis>thres){
+	// 			j=point_v_.vec3d.size();
+	// 		}
 
-		}
+	// 	}
 
-	}
+	// }
 
-	ROS_INFO("num of matched ->%d and iters %d",matched_v_.vec3d.size(),iters);
+	// ROS_INFO("num of matched ->%d and iters %d",matched_v_.vec3d.size(),iters);
 
-	// cv_bridge::CvImagePtr cv_ptr;
-    // try
-    // {
-      //pcl::toROSMsg (pcl_out, image_); //in case we had a pointcloud..
-      //pcl_ros=PointCloudToImage
-      //cv_ptr = cv_bridge::toCvCopy(image_, sensor_msgs::image_encodings::BGR8);
+	// // try
+	// //pcl::toROSMsg (pcl_out, image_); //in case we had a pointcloud..
+	// //cv_ptr = cv_bridge::toCvCopy(image_, sensor_msgs::image_encodings::BGR8);
       
-      cv::Mat image = cv_ptr->image; 
-      for (int i = 0; i < matched_v_.vec3d.size(); ++i)
-      {
-        //if(matched_v_.vec3d[i].z==1){
-          cv::Mat roi = image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
-          cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 125, 125)); 
-          double alpha = 0.3;
-          cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
-         // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
-        //}
-        // else if(obj_px[i].z==2){
-        //   cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(0,255,0));
-        // }else if(obj_px[i].z==3){
-        //   cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(0,0,255));
-        // }
-      }
+	// cv::Mat image = cv_ptr->image; 
+	// for (int i = 0; i < matched_v_.vec3d.size(); ++i)
+	// {
+	// //if(matched_v_.vec3d[i].z==1){
+	//   cv::Mat roi = image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
+	//   cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 125, 125)); 
+	//   double alpha = 0.3;
+	//   cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
+	//  // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
+	// //}
+	// // else if(obj_px[i].z==2){
+	// //   cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(0,255,0));
+	// // }else if(obj_px[i].z==3){
+	// //   cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(0,0,255));
+	// // }
+	// }
 
-      cv::imshow( "Image window", image);
-      cv::waitKey(3);
-      // if (cv_ptr->image.rows > 60 && cv_ptr->image.cols > 60)
-      // cv::circle(cv_ptr->image, cv::Point(50, 50), 10, CV_RGB(255,0,0));
- 	//}     
+	// cv::imshow( "Image window", image);
+	// cv::waitKey(3);   
 }
 
 
@@ -158,6 +185,21 @@ void callback(const slammin::pointVector3d::ConstPtr& data)
 {
 	ROS_INFO("Received map with %d points...",data->vec3d.size());
 	mapV=*data;
+}
+
+
+void get_pose_(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& ps)
+{
+	//ROS_INFO("Received pose..");
+	pose_.position.x=ps->pose.pose.position.x;
+	pose_.position.y=ps->pose.pose.position.y;
+	pose_.orientation.z=ps->pose.pose.orientation.z; 
+	pose_.orientation.w=ps->pose.pose.orientation.w; 
+	 //2d hector
+	pose_.position.z=0;
+	pose_.orientation.x=0;
+	pose_.orientation.y=0;
+
 }
 
 void extract_map(const nav_msgs::OccupancyGrid::ConstPtr& map)
@@ -182,6 +224,7 @@ int main(int argc, char** argv)
 	while(nh.ok()){ 	
 
 	sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
+	pose_sub=nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/poseupdate", 1, get_pose_);
 	// map_sub= nh.subscribe<slammin::pointVector3d> ("/mapV", 1, callback);
 	//map_sub= nh.subscribe<nav_msgs::OccupancyGrid> ("/map", 1, extract_map);
 	cam_sub= nh.subscribe<sensor_msgs::Image> ("/camera/rgb/image_raw", 1, imageCb);

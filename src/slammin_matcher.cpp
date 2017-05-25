@@ -48,8 +48,8 @@ geometry_msgs::Pose pose_;
 slammin::pointVector3d mapV,mapC;
 slammin::pointVector3d point_v_;
 std::vector<int> indexes_vec;
-float res=0.25;
 int iterations=0;
+float max_z_point=0; // for height category clustering ..
 
 void vector_data(const slammin::pointVector3d::ConstPtr& data)
 {
@@ -65,10 +65,10 @@ bool isIn(std::vector<int> ind_,int i_){
 	return false;
 }
 
-void mapgrids_onRange_rec(float angle,float pos_x,float pos_y,float res){
+void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
 
 	float newPos_x,newPox_y,x_fr_res,y_fr_res,x_lef_res,x_rig_res,y_lef_res,y_rig_res;
-	
+	float res=map_.info.resolution;
 	slammin::point3d p_;
 	//index->node id
 	int index=(int)((pos_y-map_.info.origin.position.y)/map_.info.resolution)*map_.info.height+((pos_x-map_.info.origin.position.x)/map_.info.resolution);
@@ -78,7 +78,7 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y,float res){
 	float dist=sqrt(pow(pose_.position.x-pos_x,2)+pow(pose_.position.y-pos_y,2));
 
 	//Recursion break~ 
-	if(dist>9 || isIn(indexes_vec,index)|| angle!=angle){ //quit on invalid angle value (nan)
+	if(dist>5 || isIn(indexes_vec,index)|| angle!=angle){ //quit on invalid angle value (nan)
 		// /if (isIn(indexes_vec,index)) ROS_INFO("revisited");
 		return;
 	}
@@ -123,7 +123,7 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y,float res){
 		mapV.vec3d.push_back(p_);					
 	}
 
-	mapgrids_onRange_rec(angle,newPos_x,newPox_y,res);
+	mapgrids_onRange_rec(angle,newPos_x,newPox_y);
 
 	newPos_x=pos_x+x_lef_res;
 	newPox_y=pos_y+y_lef_res;
@@ -139,7 +139,7 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y,float res){
 		mapV.vec3d.push_back(p_);					
 	}
 
-	mapgrids_onRange_rec(angle,newPos_x,newPox_y,res);	
+	mapgrids_onRange_rec(angle,newPos_x,newPox_y);	
 
 	newPos_x=pos_x+x_rig_res;
 	newPox_y=pos_y+y_rig_res;
@@ -155,7 +155,7 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y,float res){
 		mapV.vec3d.push_back(p_);					
 	}
 
-	mapgrids_onRange_rec(angle,newPos_x,newPox_y,res);		
+	mapgrids_onRange_rec(angle,newPos_x,newPox_y);		
 
 	
 //ROS_INFO("me cos %f sin %f einai sto %f %f kai tha paei sto %f %f ",cos(angle),sin(angle),pose_.position.x,pose_.position.y,mprostatoux,mprostatouy);
@@ -237,67 +237,85 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 	iterations=0;
 	//ROS_INFO("its in");
 	if(mapC.vec3d.size()>0){
-	mapgrids_onRange_rec(angle,pose_.position.x,pose_.position.y,res);}
+		mapgrids_onRange_rec(angle,pose_.position.x,pose_.position.y);
+	}
 	//ROS_INFO("its out and free %d %d",mapV.vec3d.size(),iterations);
 ROS_INFO("matched size  %d with filtered %d",mapC.vec3d.size(),mapV.vec3d.size());
 	indexes_vec.clear();
 	mapV.vec3d.clear();
-	// int thres=10000;
-	// if(mapV.vec3d.size()>0){
-	// 	ROS_INFO("tha ksekinisei %d kai me point 3 %d",mapV.vec3d.size(),point_v_.vec3d.size());
-	// }else{
-	// 	ROS_INFO("nope");
-	// }
-	// for (int i = 0; i < mapV.vec3d.size(); ++i)
-	// {
-	// 	int forthis=0;
-	// 	for (int j = 0; j < point_v_.vec3d.size(); ++j)
-	// 	{
-	// 		iters++;
+	 int thres=10000;
+
+
+	for (int i = 0; i < mapC.vec3d.size(); ++i)
+	{
+		int loopbreak=0;
+		for (int j = 0; j < point_v_.vec3d.size(); ++j)
+		{
+			iters++;
 			
-	// 		if ((std::abs(mapV.vec3d[i].x-point_v_.vec3d[j].x)<=0.3) && (std::abs(mapV.vec3d[i].y-point_v_.vec3d[j].y)<=0.3)){
-	// 			//matched_p_=point_v_.vec3d[i];
-	// 			matched_p_.x=div(point_v_.vec3d[j].posIncloud,160).rem; //matched_p_.x=point_v_.vec3d[i].x;
-	// 			matched_p_.y=div(point_v_.vec3d[j].posIncloud,160).quot;//matched_p_.y=point_v_.vec3d[i].y;
-	// 			matched_p_.z=point_v_.vec3d[j].z; //height category 
-	// 			matched_p_.posIncloud=point_v_.vec3d[j].posIncloud;
-	// 			matched_v_.vec3d.push_back(matched_p_);
-	// 			forthis++;				
-	// 		}
+			if ((std::abs(mapC.vec3d[i].x-point_v_.vec3d[j].x)<=0.2+map_.info.resolution) && (std::abs(mapC.vec3d[i].y-point_v_.vec3d[j].y)<=0.2+map_.info.resolution)){
+				//matched_p_=point_v_.vec3d[i];
+				matched_p_.x=div(point_v_.vec3d[j].posIncloud,cv_ptr->image.cols).rem; //matched_p_.x=point_v_.vec3d[i].x;
+				matched_p_.y=div(point_v_.vec3d[j].posIncloud,cv_ptr->image.cols).quot;//matched_p_.y=point_v_.vec3d[i].y;
+				matched_p_.z=point_v_.vec3d[j].z; //height category 
+				matched_p_.posIncloud=point_v_.vec3d[j].posIncloud;
 
-	// 		if(forthis>thres){
-	// 			j=point_v_.vec3d.size();
-	// 		}
+				if(matched_p_.z>max_z_point){
+					max_z_point=matched_p_.z;
+				}
 
-	// 	}
+				matched_v_.vec3d.push_back(matched_p_);
+				loopbreak++;				
+			}
 
-	// }
+			if(loopbreak>thres){
+				j=point_v_.vec3d.size();
+			}
 
-	// ROS_INFO("num of matched ->%d and iters %d",matched_v_.vec3d.size(),iters);
+		}
+
+	}
+
+	ROS_INFO("num of matched ->%d and iters %d",matched_v_.vec3d.size(),iters);
 
 	// // try
 	// //pcl::toROSMsg (pcl_out, image_); //in case we had a pointcloud..
-	// //cv_ptr = cv_bridge::toCvCopy(image_, sensor_msgs::image_encodings::BGR8);
-      
-	// cv::Mat image = cv_ptr->image; 
-	// for (int i = 0; i < matched_v_.vec3d.size(); ++i)
-	// {
-	// //if(matched_v_.vec3d[i].z==1){
-	//   cv::Mat roi = image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
-	//   cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 125, 125)); 
-	//   double alpha = 0.3;
-	//   cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
-	//  // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
-	// //}
-	// // else if(obj_px[i].z==2){
-	// //   cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(0,255,0));
-	// // }else if(obj_px[i].z==3){
-	// //   cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(0,0,255));
-	// // }
-	// }
+	// //cv_ptr = cv_bridge::toCvCopy(image_
 
-	// cv::imshow( "Image window", image);
-	// cv::waitKey(3);   
+//, sensor_msgs::image_encodings::BGR8);
+      
+	cv::Mat image = cv_ptr->image; 
+	for (int i = 0; i < matched_v_.vec3d.size(); ++i)
+	{
+		if(matched_v_.vec3d[i].z>=0.8*max_z_point){
+		  cv::Mat roi = image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
+		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 0, 125)); 
+		  double alpha = 0.3;
+		  cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
+		 // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
+		}else if(matched_v_.vec3d[i].z>=0.6*max_z_point){
+		  cv::Mat roi = image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
+		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 125, 125)); 
+		  double alpha = 0.3;
+		  cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
+		 // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
+		}else if(matched_v_.vec3d[i].z>=0.4*max_z_point){
+		  cv::Mat roi = image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
+		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 62.5, 125)); 
+		  double alpha = 0.3;
+		  cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
+		 // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
+		}else{
+		  cv::Mat roi = image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
+		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 125, 0)); 
+		  double alpha = 0.3;
+		  cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
+		  // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
+		}
+	}
+
+	cv::imshow( "Image window", image);
+	cv::waitKey(3);   
 }
 
 
@@ -319,7 +337,7 @@ void get_map_(const nav_msgs::OccupancyGrid::ConstPtr& data)
 		}
 	}
 	map_=*data;
-	
+	ROS_INFO("new map %d",mapC.vec3d.size());
 }
 
 

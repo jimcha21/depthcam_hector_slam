@@ -25,7 +25,8 @@ tf::TransformListener *tf_listener;
 
 void callback(const PointCloud::ConstPtr& pcl_in)
 {
-	PointCloud pcl_out;
+	PointCloud pcl_out,pca;
+
 	tf::StampedTransform transform;
 	try
 	{
@@ -42,13 +43,20 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 	}
 	
 	//ROS_INFO("fetched pointcloud");
-	pcl_ros::transformPointCloud("/world", *pcl_in, pcl_out, *tf_listener);
+	pcl_ros::transformPointCloud("/world", *pcl_in, pcl_out, *tf_listener);	
+
+	// pcl_ros::transformPointCloud("/base_footprint", pcl_out, pca, *tf_listener);
+	// tf_listener->lookupTransform ("/base_footprint", "/world", ros::Time(0), transform);
+	// tf::Vector3 acet(transform * tf::Vector3(pcl_out.points[1440].x, pcl_out.points[1440].y, pcl_out.points[1440].z));
+	// ROS_INFO("whazaaa2 %f %f %f %d",pca.points[1440].x,pca.points[1440].y,pca.points[1440].z,pca.points.size());
+	// ROS_INFO("whazaaup %f %f %f %d",acet.getX(),acet.getY(),acet.getZ(),pca.points.size());
+	
 	//tf_pub.publish(pcl_out);
 	//printf("fetched %d points\n",pcl_out.points.size() );
 	
 	slammin::pointVector3d v_;
 	slammin::point3d p_;
-	ROS_INFO("the size is %d",pcl_out.points.size());
+
 	int howmanynan=0;
 	for (int i = 0; i < pcl_out.points.size(); ++i)
 	{

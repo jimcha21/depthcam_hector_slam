@@ -48,7 +48,7 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 	
 	slammin::pointVector3d v_;
 	slammin::point3d p_;
-
+	ROS_INFO("the size is %d",pcl_out.points.size());
 	int howmanynan=0;
 	for (int i = 0; i < pcl_out.points.size(); ++i)
 	{

@@ -25,6 +25,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <pcl/visualization/cloud_viewer.h>
 #include <cmath>      
+#include <math.h>
 #include <opencv2/core/core.hpp>
 #include "slammin/pointVector3d.h"
 #include "slammin/point3d.h"
@@ -41,7 +42,7 @@
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 
 
-ros::Publisher pV_pub;
+ros::Publisher depthmap_pub;
 image_transport::Publisher img_pub;
 ros::Subscriber sub,map_sub,cam_sub,pose_sub;
 ros::ServiceClient client;
@@ -51,6 +52,7 @@ geometry_msgs::Pose pose_;
 slammin::pointVector3d mapV,mapC;
 slammin::pointVector3d point_v_;
 std::vector<int> indexes_vec;
+
 int iterations=0;
 float max_z_point=0; // for height category clustering ..
 
@@ -233,7 +235,7 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 	// cv::imshow("OPENCV_WINDOW", cv_ptr->image);
 	// cv::waitKey(3);
 
-	slammin::pointVector3d matched_v_,new_v_;
+	slammin::pointVector3d matched_v_,new_v_,som;
 	slammin::point3d p_;
 	int iters=0;
 	// for (int i = 0; i < point_v_.vec3d.size(); ++i)
@@ -281,14 +283,13 @@ ROS_INFO("matched %d fil %d",mapC.vec3d.size(),mapV.vec3d.size());
 
 	 int thres=1000000;
 
-	if(mapV.vec3d.size()>0){	 
-	 ROS_INFO("%f %f %f %f",mapV.vec3d[0].x,mapV.vec3d[0].y,mapC.vec3d[0].x,mapC.vec3d[0].y);
-}
+ROS_INFO("ayta p rthan %d",point_v_.vec3d.size());
 for (int i = 0; i < point_v_.vec3d.size(); ++i)
 {
 	bool found=false;
 	for (int j = 0; j < mapV.vec3d.size(); ++j){
-		if ((std::abs(mapV.vec3d[j].x-point_v_.vec3d[i].x)<=2*map_.info.resolution-0.1) && (std::abs(mapV.vec3d[j].y-point_v_.vec3d[i].y)<=2*map_.info.resolution-0.1)){
+		iters++;
+		if ((std::abs(mapV.vec3d[j].x-point_v_.vec3d[i].x)<=2*map_.info.resolution) && (std::abs(mapV.vec3d[j].y-point_v_.vec3d[i].y)<=2*map_.info.resolution)){
 			found=true;
 			p_.x=div(point_v_.vec3d[i].posIncloud,cv_ptr->image.cols).rem; //p_.x=point_v_.vec3d[i].x;
 			p_.y=div(point_v_.vec3d[i].posIncloud,cv_ptr->image.cols).quot;//p_.y=point_v_.vec3d[i].y;
@@ -308,6 +309,9 @@ for (int i = 0; i < point_v_.vec3d.size(); ++i)
 		p_.z=point_v_.vec3d[i].z; //height category 
 		p_.posIncloud=point_v_.vec3d[i].posIncloud;
 		new_v_.vec3d.push_back(p_);
+		p_.x=point_v_.vec3d[i].x; //p_.x=point_v_.vec3d[i].x;
+		p_.y=point_v_.vec3d[i].y;//p_.y=point_v_.vec3d[i].y;
+		som.vec3d.push_back(p_);
 	}
 }
 	// for (int i = 0; i < mapV.vec3d.size(); ++i)
@@ -365,13 +369,13 @@ for (int i = 0; i < point_v_.vec3d.size(); ++i)
 		 // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
 		}else if(matched_v_.vec3d[i].z>=0.6*max_z_point){
 		  cv::Mat roi =  cv_ptr->image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
-		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 125, 125)); 
+		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 62.5, 125)); 
 		  double alpha = 0.3;
 		  cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
 		 // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
 		}else if(matched_v_.vec3d[i].z>=0.4*max_z_point){
 		  cv::Mat roi =  cv_ptr->image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
-		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 62.5, 125)); 
+		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 125, 125)); 
 		  double alpha = 0.3;
 		  cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
 		 // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
@@ -398,14 +402,23 @@ for (int i = 0; i < point_v_.vec3d.size(); ++i)
 	indexes_vec.clear();
 	mapV.vec3d.clear();
 
-cv_bridge::CvImage out_msg;
-out_msg.header   = msg->header; // Same timestamp and tf frame as input image
-out_msg.encoding = sensor_msgs::image_encodings::BGR8; // Or whatever
-out_msg.image    =  cv_ptr->image; // Your cv::Mat
+	cv_bridge::CvImage out_msg;
+	out_msg.header   = msg->header; // Same timestamp and tf frame as input image
+	out_msg.encoding = sensor_msgs::image_encodings::BGR8; // Or whatever
+	out_msg.image    =  cv_ptr->image; // Your cv::Mat
 
-img_pub.publish(out_msg.toImageMsg());
+	
+	img_pub.publish(out_msg.toImageMsg());
 	cv::imshow( "Image window",  cv_ptr->image);
 	cv::waitKey(3);   
+
+	for (int i = 0; i < som.vec3d.size(); ++i)
+	{
+		//ROS_INFO("another one %f %f",new_v_.vec3d[i].x,new_v_.vec3d[i].y);
+		som.vec3d[i].x=ceil((som.vec3d[i].x+std::abs(map_.info.origin.position.x))*(1/map_.info.resolution));
+		som.vec3d[i].y=ceil((som.vec3d[i].y+std::abs(map_.info.origin.position.y))*(1/map_.info.resolution));
+	}
+	depthmap_pub.publish(som);
 
 }
 
@@ -469,9 +482,11 @@ int main(int argc, char** argv)
 		sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
 		pose_sub=nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/poseupdate", 1, get_pose_);
 		map_sub= nh.subscribe<nav_msgs::OccupancyGrid> ("/dynamic_map", 1, get_map_);
-		 image_transport::ImageTransport it(nh);
-		img_pub = it.advertise("/camera/rgb/image_ra2w", 1);
 		cam_sub= nh.subscribe<sensor_msgs::Image> ("/camera/rgb/image_raw", 1, imageCb);
+
+		image_transport::ImageTransport it(nh);
+		img_pub = it.advertise("/camera/rgb/image_ra2w", 1);
+		depthmap_pub=nh.advertise<slammin::pointVector3d> ("/depthcam_scan", 1);
 		//pV_pub = nh.advertise<slammin::pointVector3d> ("/slammin_pointVector3d", 1);
 
 		// client = nh.serviceClient<nav_msgs::GetMap>("dynamic_map");

@@ -301,6 +301,7 @@ for (int i = 0; i < point_v_.vec3d.size(); ++i)
 			}
 
 			matched_v_.vec3d.push_back(p_);
+			break;
 		}
 	}
 	if(!found){
@@ -359,42 +360,37 @@ for (int i = 0; i < point_v_.vec3d.size(); ++i)
 	// //cv_ptr = cv_bridge::toCvCopy(image_, sensor_msgs::image_encodings::BGR8);
       
 	cv::Mat image = cv_ptr->image; 
+	double alpha = 0.5;
 	for (int i = 0; i < matched_v_.vec3d.size(); ++i)
 	{
 		if(matched_v_.vec3d[i].z>=0.8*max_z_point){
-		  cv::Mat roi =  cv_ptr->image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
+		  cv::Mat roi =  image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
 		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 0, 125)); 
-		  double alpha = 0.3;
 		  cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
 		 // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
 		}else if(matched_v_.vec3d[i].z>=0.6*max_z_point){
-		  cv::Mat roi =  cv_ptr->image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
+		  cv::Mat roi =  image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
 		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 62.5, 125)); 
-		  double alpha = 0.3;
 		  cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
 		 // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
 		}else if(matched_v_.vec3d[i].z>=0.4*max_z_point){
-		  cv::Mat roi =  cv_ptr->image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
+		  cv::Mat roi =  image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
 		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 125, 125)); 
-		  double alpha = 0.3;
 		  cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
 		 // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
 		}else{
-		  cv::Mat roi =  cv_ptr->image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
+		  cv::Mat roi =  image(cv::Rect(matched_v_.vec3d[i].x,matched_v_.vec3d[i].y,1, 1));
 		  cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(0, 125, 0)); 
-		  double alpha = 0.3;
 		  cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
 		  // cv::circle(cv_ptr->image, cv::Point(obj_px[i].x, obj_px[i].y), 1, CV_RGB(255,0,0));
 		}
 	}
-
 	//colorize the new discovered 3d points-obstacles
 	for (int i = 0; i < new_v_.vec3d.size(); ++i)
 	{
 		if(new_v_.vec3d[i].x>=0&&new_v_.vec3d[i].y>=0){
-			cv::Mat roi =  cv_ptr->image(cv::Rect(new_v_.vec3d[i].x,new_v_.vec3d[i].y,1, 1));
+			cv::Mat roi =  image(cv::Rect(new_v_.vec3d[i].x,new_v_.vec3d[i].y,1, 1));
 			cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(125, 0, 0)); 
-			double alpha = 0.3;
 			cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
 		}
 	}
@@ -409,8 +405,8 @@ for (int i = 0; i < point_v_.vec3d.size(); ++i)
 
 	
 	img_pub.publish(out_msg.toImageMsg());
-	cv::imshow( "Image window",  cv_ptr->image);
-	cv::waitKey(3);   
+	//cv::imshow( "Image window",  image);
+	//cv::waitKey(3);   
 
 	for (int i = 0; i < som.vec3d.size(); ++i)
 	{
@@ -422,11 +418,10 @@ for (int i = 0; i < point_v_.vec3d.size(); ++i)
 
 }
 
-
 void get_map_(const nav_msgs::OccupancyGrid::ConstPtr& data)
 {
 	mapC.vec3d.clear();
-	for (int i = 0; i <data->info.height*data->info.width ; ++i) //map_->info.height*map_->info.width
+	for (int i = 0; i <data->info.height*data->info.width ; ++i) 
 	{
 		slammin::point3d p_;
 
@@ -441,9 +436,8 @@ void get_map_(const nav_msgs::OccupancyGrid::ConstPtr& data)
 		}
 	}
 	map_=*data;
-	ROS_INFO("new map %d",mapC.vec3d.size());
+	//ROS_INFO("new map %d",mapC.vec3d.size());
 }
-
 
 void get_pose_(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& ps)
 {
@@ -459,67 +453,22 @@ void get_pose_(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& ps)
 
 }
 
-void extract_map(const nav_msgs::OccupancyGrid::ConstPtr& map)
-{
-	ROS_INFO("Received new map...");
-	slammin::pointVector3d map_vec_in2d;
-	int a;
-	for (int i = 0; i <10 ; ++i) //map->info.height*map->info.width
-	{
-
-		if(map->data[i]!=-1){
-			ROS_INFO("%d",map->data[i]);
-		}
-	}
-	
-}
-
 int main(int argc, char** argv)
 {
 	ros::init(argc, argv, "slammin_matcher");
 	ros::NodeHandle nh;
-	//while(nh.ok()){ 	
-		sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
-		pose_sub=nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/poseupdate", 1, get_pose_);
-		map_sub= nh.subscribe<nav_msgs::OccupancyGrid> ("/dynamic_map", 1, get_map_);
-		cam_sub= nh.subscribe<sensor_msgs::Image> ("/camera/rgb/image_raw", 1, imageCb);
 
-		image_transport::ImageTransport it(nh);
-		img_pub = it.advertise("/camera/rgb/image_ra2w", 1);
-		depthmap_pub=nh.advertise<slammin::pointVector3d> ("/depthcam_scan", 1);
-		//pV_pub = nh.advertise<slammin::pointVector3d> ("/slammin_pointVector3d", 1);
+	sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
+	pose_sub=nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/poseupdate", 1, get_pose_);
+	map_sub= nh.subscribe<nav_msgs::OccupancyGrid> ("/dynamic_map", 1, get_map_);
+	cam_sub= nh.subscribe<sensor_msgs::Image> ("/camera/rgb/image_raw", 1, imageCb);
 
-		// client = nh.serviceClient<nav_msgs::GetMap>("dynamic_map");
-		// nav_msgs::GetMap srv;
-		// mapC.vec3d.clear(); //clear previously cached map data..
-		// if (client.call(srv))
-		// {
-		// 	map_= srv.response.map;		
-		// 	for (int i = 0; i <map_.info.height*map_.info.width ; ++i) //map_->info.height*map_->info.width
-		// 	{
-		// 		slammin::point3d p_;
+	image_transport::ImageTransport it(nh);
+	img_pub = it.advertise("/camera/rgb/image_ra2w", 1);
+	depthmap_pub=nh.advertise<slammin::pointVector3d> ("/depthcam_scan", 1);
+	//pV_pub = nh.advertise<slammin::pointVector3d> ("/slammin_pointVector3d", 1);
 
-		// 		//recostruction of the 2d map in world coordinates..
-		// 		if(map_.data[i]==100){
-		// 			// /ROS_INFO("%d",map_.data[i]);
-		// 			p_.x=(div(i,map_.info.height).rem)*map_.info.resolution + map_.info.origin.position.x;
-		// 			p_.y=(div(i,map_.info.height).quot)*map_.info.resolution + map_.info.origin.position.y;
-		// 			p_.z=0;
-		// 			p_.posIncloud=0; //in mapV is useless, so it will be used in the recursive func
-		// 			mapC.vec3d.push_back(p_);
-		// 		}
-		// 	}
-
-		// }
-		// else
-		// {
-		// 	ROS_ERROR("Failed to fetch the map");
-		// 	return 1;
-		// }
-
-		// ROS_INFO("matched size  %d with filtered %d",mapC.vec3d.size(),mapV.vec3d.size());
-		ros::spin();
-  	//}
+	ros::spin();
  
   return 0; 
 }

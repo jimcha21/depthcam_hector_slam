@@ -16,7 +16,6 @@
 #include "slammin/pointVector3d.h"
 #include "slammin/point3d.h"
 
-
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 
 ros::Publisher pV_pub;
@@ -25,6 +24,7 @@ tf::TransformListener *tf_listener;
 
 void callback(const PointCloud::ConstPtr& pcl_in)
 {
+	//this node gets camera's pointcloud, transforms it at global world parameters and publishes it to the slammin node..
 	PointCloud pcl_out,pca;
 
 	tf::StampedTransform transform;
@@ -60,6 +60,7 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 	int howmanynan=0;
 	for (int i = 0; i < pcl_out.points.size(); ++i)
 	{
+		//locates pointcloud points above the ground level..
 		if(!isnan(pcl_out.points[i].z)&&pcl_out.points[i].z>0.1){ //~~~>add launch parameter here for min heigth
 			p_.x=pcl_out.points[i].x;
 			p_.y=pcl_out.points[i].y;
@@ -69,7 +70,7 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 		}else if(isnan(pcl_out.points[i].z)) howmanynan++;
 
 	}
-
+	//ROS_INFO("tHA STEILEi nan %d kai to megethos einai %d",howmanynan,v_.vec3d.size());
 	// for (int i = 0; i < v_.vec3d.size(); ++i)
 	// {
 	// 	if(isnan(v_.vec3d[i].x)||isnan(v_.vec3d[i].y)||isnan(v_.vec3d[i].z)){

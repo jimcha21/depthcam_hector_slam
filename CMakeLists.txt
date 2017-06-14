@@ -33,6 +33,7 @@ generate_messages(
   DEPENDENCIES
   std_msgs
   pcl_ros
+  slammin
 )
 
 include_directories(include

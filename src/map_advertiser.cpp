@@ -9,6 +9,8 @@ ros::Publisher map_pub;
 
 int main(int argc, char** argv)
 {
+
+//this current node calls hector's slam dynamic_map service and publishes it's for the slammin_matcher node..
 	ros::init(argc, argv, "map_advertiser");
 	ros::NodeHandle nh;
 	

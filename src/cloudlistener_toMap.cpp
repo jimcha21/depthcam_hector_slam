@@ -25,7 +25,7 @@ tf::TransformListener *tf_listener;
 void callback(const PointCloud::ConstPtr& pcl_in)
 {
 	//this node gets camera's pointcloud, transforms it at global world parameters and publishes it to the slammin node..
-	PointCloud pcl_out,pca;
+	PointCloud pcl_out,pcl_out2,pca;
 
 	tf::StampedTransform transform;
 	try
@@ -34,7 +34,7 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 	}
 	catch (tf::LookupException &e)
 	{
-		return ;
+		return;
 	}
 	catch (tf::ExtrapolationException &e)
 	{
@@ -43,8 +43,17 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 	}
 	
 	//ROS_INFO("fetched pointcloud");
-	pcl_ros::transformPointCloud("/world", *pcl_in, pcl_out, *tf_listener);	
+	for (int i = 0; i < pcl_in->points.size(); ++i)
+	{
+		//locates pointcloud points above the ground level..
+		if(!isnan(pcl_in->points[i].z)&&pcl_in->points[i].z>0.1){ //~~~>add launch parameter here for min heigth
+			//ROS_INFO("edw vrika ena %f %f %f",pcl_in->points[i].x,pcl_in->points[i].y,pcl_in->points[i].z);
+		}
 
+	}
+
+	pcl_ros::transformPointCloud("/world", *pcl_in, pcl_out, *tf_listener);	
+	pcl_ros::transformPointCloud("/base_link", pcl_out, pcl_out2, *tf_listener);	
 	// pcl_ros::transformPointCloud("/base_footprint", pcl_out, pca, *tf_listener);
 	// tf_listener->lookupTransform ("/base_footprint", "/world", ros::Time(0), transform);
 	// tf::Vector3 acet(transform * tf::Vector3(pcl_out.points[1440].x, pcl_out.points[1440].y, pcl_out.points[1440].z));
@@ -58,18 +67,27 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 	slammin::point3d p_;
 
 	int howmanynan=0;
-	for (int i = 0; i < pcl_out.points.size(); ++i)
+	ROS_INFO("======================================");
+	int count5=0,count6=0;
+	for (int i = 0; i < pcl_out2.points.size(); ++i)
 	{
 		//locates pointcloud points above the ground level..
-		if(!isnan(pcl_out.points[i].z)&&pcl_out.points[i].z>0.1){ //~~~>add launch parameter here for min heigth
-			p_.x=pcl_out.points[i].x;
-			p_.y=pcl_out.points[i].y;
-			p_.z=pcl_out.points[i].z;
+		if(!isnan(pcl_out2.points[i].z)&&pcl_out2.points[i].z>0.1){ //~~~>add launch parameter here for min heigth
+			p_.x=pcl_out2.points[i].x;
+			p_.y=pcl_out2.points[i].y;
+			p_.z=pcl_out2.points[i].z;
 			p_.posIncloud=i;
 			v_.vec3d.push_back(p_);
-		}else if(isnan(pcl_out.points[i].z)) howmanynan++;
-
+			//ROS_INFO("edw vrika ena %f %f %f",p_.x,p_.y,p_.z);
+			if(p_.x>6)
+				count6++;
+			else if(p_.x>5)
+				count5++;
+		}else if(isnan(pcl_out2.points[i].z)) howmanynan++;
 	}
+
+	ROS_INFO("ta 6 einai %d ta 5 einai %d",count6,count5);
+
 	//ROS_INFO("tHA STEILEi nan %d kai to megethos einai %d",howmanynan,v_.vec3d.size());
 	// for (int i = 0; i < v_.vec3d.size(); ++i)
 	// {

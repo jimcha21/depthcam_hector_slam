@@ -114,7 +114,7 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
 	index=(int)((newPos_y-map_.info.origin.position.y)/map_.info.resolution)*map_.info.height+((newPos_x-map_.info.origin.position.x)/map_.info.resolution);
 
 	//ROS_INFO("the index is %d with coords %f %f me angle %f",index,newPos_x,newPos_y,angle);
-	if(map_.data[index]>=0){
+	if(map_.data[index]==100){
 		//ROS_INFO("found here! ");
 		p_.x=newPos_x;
 		p_.y=newPos_y;
@@ -142,7 +142,7 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
 	index=(int)((newPos_y-map_.info.origin.position.y)/map_.info.resolution)*map_.info.height+((newPos_x-map_.info.origin.position.x)/map_.info.resolution);
 
 	//ROS_INFO("the index is %d with coords %f %f me angle %f",index,newPos_x,newPos_y,angle);
-	if(map_.data[index]>=0){
+	if(map_.data[index]==100){
 		//ROS_INFO("found here! ");
 		p_.x=newPos_x;
 		p_.y=newPos_y;
@@ -169,7 +169,7 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
 	index=(int)((newPos_y-map_.info.origin.position.y)/map_.info.resolution)*map_.info.height+((newPos_x-map_.info.origin.position.x)/map_.info.resolution);
 
 	//ROS_INFO("the index is %d with coords %f %f me angle %f",index,newPos_x,newPos_y,angle);
-	if(map_.data[index]>=0){
+	if(map_.data[index]==100){
 		//ROS_INFO("found here! ");
 		p_.x=newPos_x;
 		p_.y=newPos_y;
@@ -274,7 +274,7 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 		mapgrids_onRange_rec(angle,pose_.position.x,pose_.position.y);
 	}
 	//ROS_INFO("its out and free %d %d",mapREC.vec3d.size(),iterations);
-ROS_INFO("EKANE REC %d",iterations);
+	//ROS_INFO("EKANE REC %d",iterations);
 	ROS_INFO("Exhastive search matches and Recursive %d",/*mapC.vec3d.size(),*/mapREC.vec3d.size());
 	//ROS_INFO("ayta p rthan %d",depthCamera_points.vec3d.size());
 	
@@ -313,7 +313,7 @@ ROS_INFO("EKANE REC %d",iterations);
 		}
 	}
 
-	ROS_INFO("to size twn rec %d kai to size twn som %d",mapREC.vec3d.size(),som.vec3d.size());
+	
 	// for (int i = 0; i < mapREC.vec3d.size(); ++i)
 	// {
 	// 	int loopbreak=0;bool found=false;
@@ -387,6 +387,8 @@ ROS_INFO("EKANE REC %d",iterations);
 	//colorize the new discovered 3d points-obstacles
 	for (int i = 0; i < new_v_.vec3d.size(); ++i)
 	{
+		if(i>20)
+			break;
 		if(new_v_.vec3d[i].x>=0&&new_v_.vec3d[i].y>=0){
 			cv::Mat roi =  image(cv::Rect(new_v_.vec3d[i].x,new_v_.vec3d[i].y,1, 1));
 			cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(125, 0, 0)); 
@@ -407,12 +409,12 @@ ROS_INFO("EKANE REC %d",iterations);
 	//cv::imshow( "Image window",  image);
 	//cv::waitKey(3);   
 
-	for (int i = 0; i < som.vec3d.size(); ++i)
+/*	for (int i = 0; i < som.vec3d.size(); ++i)
 	{
 		//ROS_INFO("another one %f %f",new_v_.vec3d[i].x,new_v_.vec3d[i].y);
 		som.vec3d[i].x=ceil((som.vec3d[i].x+std::abs(map_.info.origin.position.x))*(1/map_.info.resolution));
 		som.vec3d[i].y=ceil((som.vec3d[i].y+std::abs(map_.info.origin.position.y))*(1/map_.info.resolution));
-	}
+	}*/
 	depthmap_pub.publish(som);
 
 }
@@ -433,7 +435,7 @@ void get_map_(const nav_msgs::OccupancyGrid::ConstPtr& data)
 		slammin::point3d p_;
 		coun++;
 		//recostruction of the 2d map in world coordinates..
-		if(data->data[i]>0){
+		if(data->data[i]==100){
 			// /ROS_INFO("%d",map_.data[i]);
 			p_.x=(div(i,data->info.height).rem)*data->info.resolution + data->info.origin.position.x;
 			p_.y=(div(i,data->info.height).quot)*data->info.resolution + data->info.origin.position.y;

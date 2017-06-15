@@ -17,18 +17,17 @@
 #include "slammin/point3d.h"
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
+typedef pcl::PointCloud<pcl::PointXYZ> PointCloud_simpl;
 
-ros::Publisher pV_pub;
+ros::Publisher pV_pub,dP_pub;
 ros::Subscriber sub,dub ;
 tf::TransformListener *tf_listener; 
-PointCloud depth_in;
-
 
 void callback(const PointCloud::ConstPtr& pcl_in)
 {
 	//this node gets camera's pointcloud, transforms it at global world parameters and publishes it to the slammin node..
 	PointCloud pcl_out,pca;
-
+	
 	tf::StampedTransform transform;
 	try
 	{
@@ -59,11 +58,10 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 	slammin::point3d p_;
 
 	int howmanynan=0;
-	ROS_INFO("======================================");
 	for (int i = 0; i < pcl_out.points.size(); ++i)
 	{
 		//locates pointcloud points above the ground level..
-		if(!isnan(pcl_out.points[i].z)&&pcl_out.points[i].z>0.1){ //~~~>add launch parameter here for min heigth
+		if(!isnan(pcl_out.points[i].z)&&pcl_out.points[i].z>0.1){ //~~~>add launch parameter here for min height
 			p_.x=pcl_out.points[i].x;
 			p_.y=pcl_out.points[i].y;
 			p_.z=pcl_out.points[i].z;
@@ -72,7 +70,6 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 			//ROS_INFO("edw vrika ena %f %f %f",p_.x,p_.y,p_.z);
 		}else if(isnan(pcl_out.points[i].z)) howmanynan++;
 	}
-
 
 	//ROS_INFO("tHA STEILEi nan %d kai to megethos einai %d",howmanynan,v_.vec3d.size());
 	// for (int i = 0; i < v_.vec3d.size(); ++i)
@@ -84,49 +81,73 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 
 	pV_pub.publish(v_);
 
-	PointCloud depth_out;
-	pcl_ros::transformPointCloud("/world", pcl_out, depth_in, *tf_listener);	
-	pcl_ros::transformPointCloud("/base_link", depth_in, depth_out, *tf_listener);	
-	ROS_INFO("TO PRWTO arxiko %f %f %f",depth_in.points[0].x,depth_in.points[0].y,depth_in.points[0].z);
-	ROS_INFO("TEOLOS px des ayto %f %f %f",depth_out.points[0].x,depth_out.points[0].y,depth_out.points[0].z);
-	depth_in.points.clear();
-
-/*	for (int i = 0; i < depth_out.points.size(); ++i)
-	{
-
-
-		ROS_INFO("px des ayto %f %f %f",depth_out.points[i].x,depth_out.points[i].y,depth_out.points[i].z);
-	}*/
-
-/*	int count5=0,count6=0;
-			if(p_.x>6)
-				count6++;
-			else if(p_.x>5)
-				count5++;*/
-
-	//ROS_INFO("ta 6 einai %d ta 5 einai %d",count6,count5);
 }
 
 void depthcam_scanCallback(const slammin::pointVector3d::ConstPtr& data){
-	//depthPoints=*data;
-/*	pcl::PointXYZRGB p_;
-	depth_in.points.push_back(p_);*/
-	ROS_INFO("elave %d",data->vec3d.size());
-	for (int i = 0; i < depth_in.points.size(); ++i)
-	{
-		depth_in.points[i].x=0;
-		depth_in.points[i].y=0;
-		depth_in.points[i].z=0;
 
+	//this node 
+	PointCloud_simpl depth_in,depth_out;
+	//PointCloud::Ptr msg (new PointCloud);
+	
+	depth_in.header.frame_id="/world";
+	depth_in.height=data->vec3d.size();
+	depth_in.width=1;
+	tf::Vector3 mapToglobal_coords;
+
+	if(data->vec3d.size()>0){
+		for (int i = 0; i < depth_in.height; ++i)
+		{
+/*			mapToglobal_coords.setX(data->vec3d[i].x/2048*10);
+			mapToglobal_coords.setY(data->vec3d[i].y/2048*10);
+			mapToglobal_coords.setZ(data->vec3d[i].z/2048*10);
+			depth_in.points.push_back (pcl::PointXYZ(mapToglobal_coords.getX(),mapToglobal_coords.getY(),mapToglobal_coords.getZ()));*/
+			depth_in.points.push_back (pcl::PointXYZ(data->vec3d[i].x,data->vec3d[i].y,data->vec3d[i].z));
+		}
+
+		ROS_INFO("elave %d",data->vec3d.size());
+
+		tf::StampedTransform transform;
+		try
+		{
+			tf_listener->lookupTransform ("/base_link", depth_in.header.frame_id, fromPCL(depth_in.header).stamp, transform);
+		}
+		catch (tf::LookupException &e)
+		{
+			return;
+		}
+		catch (tf::ExtrapolationException &e)
+		{
+			//ROS_ERROR ("%s", e.what ());
+			return;
+		}
+		ROS_INFO("ta perase");
+
+		pcl_ros::transformPointCloud("/base_link", depth_in, depth_out, *tf_listener);	
+/*		ROS_INFO("TO PRWTO arxiko %f %f %f",depth_in.points[0].x,depth_in.points[0].y,depth_in.points[0].z);
+		ROS_INFO("TEOLOS px des ayto %f %f %f",depth_out.points[0].x,depth_out.points[0].y,depth_out.points[0].z);
+		ROS_INFO("TO d arxiko %f %f %f",depth_in.points[1].x,depth_in.points[1].y,depth_in.points[1].z);
+		ROS_INFO("d px des ayto %f %f %f",depth_out.points[1].x,depth_out.points[1].y,depth_out.points[1].z);
+		ROS_INFO("TO t arxiko %f %f %f",depth_in.points[2].x,depth_in.points[2].y,depth_in.points[2].z);
+		ROS_INFO("t px des ayto %f %f %f",depth_out.points[2].x,depth_out.points[2].y,depth_out.points[2].z);*/
+
+		slammin::pointVector3d v_;
+		slammin::point3d p_;
+
+		for (int i = 0; i < depth_out.points.size(); ++i)
+		{
+			p_.x=depth_out.points[i].x;
+			p_.y=depth_out.points[i].y;
+			p_.z=depth_out.points[i].z;
+			p_.posIncloud=i;
+			v_.vec3d.push_back(p_);
+		}
+		dP_pub.publish(v_);
 	}
 
-	for (int i = 0; i < data->vec3d.size(); ++i)
-  	{
-		depth_in.points[i].x=data->vec3d[i].x;
-		depth_in.points[i].y=data->vec3d[i].y;
-		depth_in.points[i].z=data->vec3d[i].z;
-  	}
-}
+		
+	}
+
+
 
 
 int main(int argc, char** argv)
@@ -138,6 +159,7 @@ int main(int argc, char** argv)
 	dub= nh.subscribe<slammin::pointVector3d>("/depthcam_scan", 1, depthcam_scanCallback);
 
   pV_pub = nh.advertise<slammin::pointVector3d> ("/slammin_pointVector3d", 1);
+  dP_pub = nh.advertise<slammin::pointVector3d> ("/depthcam_scan_coords", 1);
 
 // ros::Rate rate(10.0);
 // while (nh.ok()){

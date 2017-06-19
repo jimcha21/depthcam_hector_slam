@@ -78,7 +78,7 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
 	float dist=sqrt(pow(pose_.position.x-pos_x,2)+pow(pose_.position.y-pos_y,2));
 
 	//Recursion break~ 
-	if(dist>9 || visited(indexes_vec,index)|| angle!=angle){ //quit on invalid angle value (nan)
+	if(dist>3 || visited(indexes_vec,index)|| angle!=angle){ //quit on invalid angle value (nan)
 		// /if (visited(indexes_vec,index)) ROS_INFO("revisited");
 		return;
 	}
@@ -301,7 +301,9 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 				break;
 			}
 		}
-		if(!found){
+		float dist=sqrt(pow(pose_.position.x-depthCamera_points.vec3d[i].x,2)+pow(pose_.position.y-depthCamera_points.vec3d[i].y,2));
+
+		if(!found&&dist<=3){
 			p_.x=div(depthCamera_points.vec3d[i].posIncloud,cv_ptr->image.cols).rem; //p_.x=depthCamera_points.vec3d[i].x;
 			p_.y=div(depthCamera_points.vec3d[i].posIncloud,cv_ptr->image.cols).quot;//p_.y=depthCamera_points.vec3d[i].y;
 			p_.z=depthCamera_points.vec3d[i].z; //height category 
@@ -387,8 +389,6 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 	//colorize the new discovered 3d points-obstacles
 	for (int i = 0; i < new_v_.vec3d.size(); ++i)
 	{
-		if(i>20)
-			break;
 		if(new_v_.vec3d[i].x>=0&&new_v_.vec3d[i].y>=0){
 			cv::Mat roi =  image(cv::Rect(new_v_.vec3d[i].x,new_v_.vec3d[i].y,1, 1));
 			cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(125, 0, 0)); 

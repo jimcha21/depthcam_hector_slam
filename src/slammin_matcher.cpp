@@ -40,7 +40,7 @@
 #define PI 3.14159265
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
-int max_scan_dist=5;
+float max_scanned_depth_;
 
 ros::Publisher depthmap_pub;
 image_transport::Publisher img_pub;
@@ -77,7 +77,7 @@ void find_mapgrids_onRange(float angle,float pos_x,float pos_y){
 	float dist=sqrt(pow(pose_.position.x-pos_x,2)+pow(pose_.position.y-pos_y,2));
 
 	//Recursion break~ 
-	if(dist > max_scan_dist || visited(indexes_vec,index)|| angle!=angle){ //quit on invalid angle value (nan)
+	if(dist > max_scanned_depth_ || visited(indexes_vec,index)|| angle!=angle){ //quit on invalid angle value (nan)
 		// /if (visited(indexes_vec,index)) ROS_INFO("revisited");
 		return;
 	}
@@ -310,7 +310,7 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 
 		float dist=sqrt(pow(pose_.position.x-depthCamera_points.vec3d[i].x,2)+pow(pose_.position.y-depthCamera_points.vec3d[i].y,2));
 
-		if(!found && dist<=max_scan_dist){
+		if(!found && dist<=max_scanned_depth_){
 			p_.x=div(depthCamera_points.vec3d[i].posIncloud,cv_ptr->image.cols).rem; //p_.x=depthCamera_points.vec3d[i].x;
 			p_.y=div(depthCamera_points.vec3d[i].posIncloud,cv_ptr->image.cols).quot;//p_.y=depthCamera_points.vec3d[i].y;
 			p_.z=depthCamera_points.vec3d[i].z; //height category 
@@ -435,8 +435,9 @@ void get_pose_(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& ps)
 int main(int argc, char** argv)
 {
 	ros::init(argc, argv, "slammin_matcher");
-	ros::NodeHandle nh;
-
+	ros::NodeHandle nh("~");
+  	nh.getParam("max_scanned_depth", max_scanned_depth_);
+  	ROS_INFO("HEHE %f",max_scanned_depth_);
 	//subscribers
 	sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
 	pose_sub=nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/poseupdate", 1, get_pose_);

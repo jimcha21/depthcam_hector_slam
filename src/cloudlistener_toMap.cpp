@@ -18,6 +18,8 @@
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 typedef pcl::PointCloud<pcl::PointXYZ> PointCloud_simpl;
+float min_scanned_height_;
+
 
 ros::Publisher pV_pub,dP_pub;
 ros::Subscriber sub,dub ;
@@ -61,7 +63,7 @@ void callback(const PointCloud::ConstPtr& pcl_in)
 	for (int i = 0; i < pcl_out.points.size(); ++i)
 	{
 		//locates pointcloud points above the ground level..
-		if(!isnan(pcl_out.points[i].z)&&pcl_out.points[i].z>0.1){ //~~~>add launch parameter here for min height
+		if(!isnan(pcl_out.points[i].z)&&pcl_out.points[i].z>min_scanned_height_){ //~~~>add launch parameter here for min height
 			p_.x=pcl_out.points[i].x;
 			p_.y=pcl_out.points[i].y;
 			p_.z=pcl_out.points[i].z;
@@ -145,7 +147,9 @@ void depthcam_scanCallback(const slammin::pointVector3d::ConstPtr& data){
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "cloudlistener_toMap");
-  ros::NodeHandle nh;
+  ros::NodeHandle nh("~");
+  nh.getParam("min_scanned_height", min_scanned_height_);
+  ROS_INFO("HEHE %f",min_scanned_height_);
   tf_listener    = new tf::TransformListener();
 
   sub= nh.subscribe<PointCloud>("/camera/depth/points", 1, callback);

@@ -43,6 +43,9 @@
   typedef btScalar tfScalar;
 #endif
 
+//depth camera's extra data preview only(false) or make the interact with drone's lidar data to enrich slam mapping.. 
+bool depthData_onSlam=false;
+
 HectorMappingRos::HectorMappingRos()
   : debugInfoProvider(0)
   , hectorDrawings(0)
@@ -178,8 +181,11 @@ HectorMappingRos::HectorMappingRos()
   ROS_INFO("HectorSM p_laser_z_min_value_: %f", p_laser_z_min_value_);
   ROS_INFO("HectorSM p_laser_z_max_value_: %f", p_laser_z_max_value_);
 
-  depthcam_scanSubscriber_L = node_.subscribe("/depthcam_scan_coords", 1, &HectorMappingRos::depthcam_scanCallbackLocal, this);
-  depthcam_scanSubscriber_G = node_.subscribe("/depthcam_scan", 1, &HectorMappingRos::depthcam_scanCallbackGlobal, this);
+  //depth camera's extra data preview only or make the interact with drone's lidar data to enrich slam mapping.. 
+  if(depthData_onSlam)
+    depthcam_scanSubscriber_L = node_.subscribe("/depthcam_scan_coords", 1, &HectorMappingRos::depthcam_scanCallbackLocal, this);
+  else
+    depthcam_scanSubscriber_G = node_.subscribe("/depthcam_scan", 1, &HectorMappingRos::depthcam_scanCallbackGlobal, this);
   scanSubscriber_ = node_.subscribe(p_scan_topic_, p_scan_subscriber_queue_size_, &HectorMappingRos::scanCallback, this);
   sysMsgSubscriber_ = node_.subscribe(p_sys_msg_topic_, 2, &HectorMappingRos::sysMsgCallback, this);
 
@@ -229,12 +235,25 @@ HectorMappingRos::~HectorMappingRos()
 }
 
 void HectorMappingRos::depthcam_scanCallbackGlobal(const slammin::pointVector3d::Ptr& data){
-  ROS_INFO("new global data");
-  global_depth_map_=*data;
+  //ROS_INFO("new global data and the size is %d and i got %d",global_depth_map_.vec3d.size(),data->vec3d.size());
+  slammin::point3d p_;  
+
+  //if global map gets to big..
+  if(global_depth_map_.vec3d.size()>2000000){
+    global_depth_map_.vec3d.clear();
+  }
+
+  //faster vector update (we dont care for duplicates.. only for preview use)
+  for (int i = 0; i < data->vec3d.size(); ++i){
+    p_.x=data->vec3d[i].x; p_.y=data->vec3d[i].y; p_.z=data->vec3d[i].z; p_.posIncloud=data->vec3d[i].posIncloud;
+    global_depth_map_.vec3d.push_back(p_);
+  }
+  //or just the newly scaned..
+  //global_depth_map_=*data;
 }
 
 void HectorMappingRos::depthcam_scanCallbackLocal(const slammin::pointVector3d::Ptr& data){
-  ROS_INFO("new kine data");
+  ROS_INFO("new depth data");
   depth_map_=*data;
 }
 
@@ -274,7 +293,8 @@ void HectorMappingRos::scanCallback(const sensor_msgs::LaserScan& scan)
 
       if(rosPointCloudToDataContainer(laser_point_cloud_, laserTransform, laserScanContainer, slamProcessor->getScaleToMap()))
       {
-        rosDepthPointCloudToDataContainer(laserTransform, laserScanContainer, slamProcessor->getScaleToMap());
+        if(depthData_onSlam)
+          rosDepthPointCloudToDataContainer(laserTransform, laserScanContainer, slamProcessor->getScaleToMap());
 
         if (initial_pose_set_){
           initial_pose_set_ = false;
@@ -419,21 +439,33 @@ void HectorMappingRos::publishMap(MapPublisherContainer& mapPublisher, const hec
         data[i] = 100;
       }
     }
-    ROS_INFO("going to post a map");
-    for (int i = 0; i < global_depth_map_.vec3d.size(); ++i)
-    {
-      //ROS_INFO("another one %f %f",new_v_forImage.vec3d[i].x,new_v_forImage.vec3d[i].y);
-      //ROS_INFO("tha valei sto %f %f kai exei synolo %d",a,b,depth_map_.vec3d.size());
-      if (global_depth_map_.vec3d[i].z>0)
+
+    //ROS_INFO("going to post a map %d",global_depth_map_.vec3d.size());
+    if(!depthData_onSlam){
+      for (int i = 0; i < global_depth_map_.vec3d.size(); ++i)
       {
-        float a,b;      
+        float a,b,max_z=1.2; //max_z only for willow - height clustering factor..
+
         a=ceil((global_depth_map_.vec3d[i].x+std::abs( map_.map.info.origin.position.x))*(1/map_.map.info.resolution));
         b=ceil((global_depth_map_.vec3d[i].y+std::abs( map_.map.info.origin.position.y))*(1/map_.map.info.resolution));
-        data[a+b*sizeY] = 200;
-        //data[(int)(global_depth_map_.vec3d[i].x+global_depth_map_.vec3d[i].y*sizeY)]=200;// = 10000+depth_map_.vec3d[i].z;
+        //to avoid overwriting slam discovered occupied map points..
+        if(gridMap.isOccupied(a+b*sizeY)){
+          continue;
+        }
+        if(global_depth_map_.vec3d[i].z>=0.9*max_z)
+          data[a+b*sizeY] = 150;
+        else if(global_depth_map_.vec3d[i].z>=0.7*max_z)
+          data[a+b*sizeY] = 200;
+        else if(global_depth_map_.vec3d[i].z>=0.5*max_z)
+          data[a+b*sizeY] = 250;
+        else if(global_depth_map_.vec3d[i].z>=0.3*max_z)
+          data[a+b*sizeY] = 120;
+        else if(global_depth_map_.vec3d[i].z>=0.2*max_z)
+          data[a+b*sizeY] = 115;
+        else if(global_depth_map_.vec3d[i].z>=0.1*max_z)
+          data[a+b*sizeY] = 110;      
       }
     }
-
    
     lastGetMapUpdateIndex = gridMap.getUpdateIndex();
 
@@ -478,7 +510,6 @@ bool HectorMappingRos::rosLaserScanToDataContainer(const sensor_msgs::LaserScan&
 
 bool HectorMappingRos::rosDepthPointCloudToDataContainer(const tf::StampedTransform& laserTransform, hectorslam::DataContainer& dataContainer, float scaleToMap)
 {
-  return true;
   if(depth_map_.vec3d.size()>0){
     for (int i = 0; i < depth_map_.vec3d.size(); i=i+25)
     {

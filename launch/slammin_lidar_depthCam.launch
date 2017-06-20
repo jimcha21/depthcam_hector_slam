@@ -2,8 +2,16 @@
 
 <launch>   
 
-<node name="cloudlistener_toMap_node" pkg="slammin" type="cloudlistener_toMap" respawn="false" output="screen"/>
+<!-- <include file="$(find hector_quadrotor_demo)/launch/debug.launch"/> -->
+
+<node name="cloudlistener_toMap_node" pkg="slammin" type="cloudlistener_toMap" respawn="false" output="screen">
+	<param name="min_scanned_height" value="0.2"/>
+</node>
+
 <node name="map_advertiser_node" pkg="slammin" type="map_advertiser" respawn="false" output="screen"/>
-<node name="slammin_matcher_node" pkg="slammin" type="slammin_matcher" respawn="false" output="screen"/>
+
+<node name="slammin_matcher_node" pkg="slammin" type="slammin_matcher" respawn="false" output="screen">
+	<param name="max_scanned_depth" value="5"/>
+</node>
 
 </launch>

@@ -11,7 +11,8 @@ find_package(cmake_modules REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system filesystem thread)
 find_package(Eigen REQUIRED)
 find_package(PCL REQUIRED)
-find_package( OpenCV REQUIRED )
+find_package(OpenCV REQUIRED)
+
 find_package(catkin REQUIRED COMPONENTS
 	pcl_ros
 	roscpp
@@ -55,9 +56,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-
-add_executable(${PROJECT_NAME}_node src/kati.cpp)
-target_link_libraries(${PROJECT_NAME}_node ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${Eigen_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(cloudlistener_toMap src/cloudlistener_toMap.cpp)
 target_link_libraries(cloudlistener_toMap ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${Eigen_LIBRARIES} ${PCL_LIBRARIES})

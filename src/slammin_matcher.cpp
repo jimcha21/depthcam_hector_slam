@@ -40,7 +40,7 @@
 #define PI 3.14159265
 
 typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
-
+int max_scan_dist=5;
 
 ros::Publisher depthmap_pub;
 image_transport::Publisher img_pub;
@@ -53,7 +53,7 @@ slammin::pointVector3d mapREC,mapC;
 slammin::pointVector3d depthCamera_points;
 std::vector<int> indexes_vec;
 
-int iterations=0;
+int recursive_func_iterations=0;
 float max_z_point=0; // for height category clustering ..
 
 bool visited(std::vector<int> ind_,int i_){
@@ -64,8 +64,8 @@ bool visited(std::vector<int> ind_,int i_){
 	return false;
 }
 
-//the recursive..
-void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
+//the recursive func..
+void find_mapgrids_onRange(float angle,float pos_x,float pos_y){
 
 	float newPos_x,newPos_y,x_fr_res,y_fr_res,x_lef_res,x_rig_res,y_lef_res,y_rig_res;
 	float res=map_.info.resolution;
@@ -73,16 +73,15 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
 	//index->node id
 	int index=(int)((pos_y-map_.info.origin.position.y)/map_.info.resolution)*map_.info.height+((pos_x-map_.info.origin.position.x)/map_.info.resolution);
 	
-	
 	//calculate 3d point distance from the robot, to check if this measurement is over the limit..
 	float dist=sqrt(pow(pose_.position.x-pos_x,2)+pow(pose_.position.y-pos_y,2));
 
 	//Recursion break~ 
-	if(dist>3 || visited(indexes_vec,index)|| angle!=angle){ //quit on invalid angle value (nan)
+	if(dist > max_scan_dist || visited(indexes_vec,index)|| angle!=angle){ //quit on invalid angle value (nan)
 		// /if (visited(indexes_vec,index)) ROS_INFO("revisited");
 		return;
 	}
-	iterations++; //debugin
+	recursive_func_iterations++; //debugin
 
 	//mark as visited gridmap point
 	indexes_vec.push_back(index);	
@@ -106,7 +105,7 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
 		x_fr_res=res;y_fr_res=0;  x_lef_res=res;y_lef_res=res;  x_rig_res=res;y_rig_res=-res;
 	}
 
-
+	//front gridBox
 	// newPos_x=cos(angle*PI/180)*pose_.position.x-sin(angle*PI/180)*pose_.position.y+x_fr_res;
 	// newPos_y=sin(angle*PI/180)*pose_.position.x+cos(angle*PI/180)*pose_.position.y+y_fr_res;
 	newPos_x=pos_x+x_fr_res;
@@ -135,8 +134,9 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
 	// 	}
 	// }
 
-	mapgrids_onRange_rec(angle,newPos_x,newPos_y);
+	find_mapgrids_onRange(angle,newPos_x,newPos_y);
 
+	//front-left gridBox
 	newPos_x=pos_x+x_lef_res;
 	newPos_y=pos_y+y_lef_res;
 	index=(int)((newPos_y-map_.info.origin.position.y)/map_.info.resolution)*map_.info.height+((newPos_x-map_.info.origin.position.x)/map_.info.resolution);
@@ -162,8 +162,11 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
 	// 		i==mapC.vec3d.size();
 	// 	}
 	// }
-	mapgrids_onRange_rec(angle,newPos_x,newPos_y);	
 
+	find_mapgrids_onRange(angle,newPos_x,newPos_y);	
+
+
+	//front-right gridBox
 	newPos_x=pos_x+x_rig_res;
 	newPos_y=pos_y+y_rig_res;
 	index=(int)((newPos_y-map_.info.origin.position.y)/map_.info.resolution)*map_.info.height+((newPos_x-map_.info.origin.position.x)/map_.info.resolution);
@@ -189,7 +192,8 @@ void mapgrids_onRange_rec(float angle,float pos_x,float pos_y){
 	// 		i==mapC.vec3d.size();
 	// 	}
 	// }
-	mapgrids_onRange_rec(angle,newPos_x,newPos_y);		
+
+	find_mapgrids_onRange(angle,newPos_x,newPos_y);		
 
 	
 //ROS_INFO("me cos %f sin %f einai sto %f %f kai tha paei sto %f %f ",cos(angle),sin(angle),pose_.position.x,pose_.position.y,mprostatoux,mprostatouy);
@@ -230,7 +234,7 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 	// cv::imshow("OPENCV_WINDOW", cv_ptr->image);
 	// cv::waitKey(3);
 
-	slammin::pointVector3d matched_points_,new_v_,som;
+	slammin::pointVector3d matched_points_,new_v_forImage,new_v_forSlam;
 	slammin::point3d p_;
 	int iters=0;
 	// for (int i = 0; i < depthCamera_points.vec3d.size(); ++i)
@@ -255,11 +259,13 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 
 
 // ...
+
+	//transform drone's quat pose to euler..
 	tf::Quaternion q(pose_.orientation.x,pose_.orientation.y,pose_.orientation.z,pose_.orientation.w);
 	tf::Matrix3x3 m(q);
 	double roll, pitch, yaw;
 	m.getRPY(roll, pitch, yaw);
-
+	//and calculate posing straffe..
 	float angle;
 	angle=(180*std::abs(yaw))/3.10;
 	if(yaw<0){
@@ -268,24 +274,24 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 	}
 	//ROS_INFO("angle %f",angle);
 
-	iterations=0;
-	//ROS_INFO("its in");
-	if(map_.info.width>0){//.vec3d.size()>0){
-		mapgrids_onRange_rec(angle,pose_.position.x,pose_.position.y);
-	}
-	//ROS_INFO("its out and free %d %d",mapREC.vec3d.size(),iterations);
-	//ROS_INFO("EKANE REC %d",iterations);
-	ROS_INFO("Exhastive search matches and Recursive %d",/*mapC.vec3d.size(),*/mapREC.vec3d.size());
-	//ROS_INFO("ayta p rthan %d",depthCamera_points.vec3d.size());
-	
-	int thres=1000000;
-	
+	recursive_func_iterations=0;
+	//fetch map's occupied squares, in front of drone..
+	if(map_.info.width>0)
+		find_mapgrids_onRange(angle,pose_.position.x,pose_.position.y);
+	else
+		return;
+
+	//ROS_INFO("its out and free %d %d",mapREC.vec3d.size(),recursive_func_iterations);
+	//ROS_INFO("Exhastive search matches and Recursive %d",/*mapC.vec3d.size(),*/mapREC.vec3d.size());
+		
+	//find matched occupied points with Depth Camera's data.. and save any new occupied points (that slam node hasn't found)
 	for (int i = 0; i < depthCamera_points.vec3d.size(); ++i)
 	{
 		bool found=false;
 		for (int j = 0; j < mapREC.vec3d.size(); ++j){
 			iters++;
-			if ((std::abs(mapREC.vec3d[j].x-depthCamera_points.vec3d[i].x)<=2*map_.info.resolution) && (std::abs(mapREC.vec3d[j].y-depthCamera_points.vec3d[i].y)<=2*map_.info.resolution)){
+			//if point exists as occupied in slam map..
+			if ((std::abs(mapREC.vec3d[j].x-depthCamera_points.vec3d[i].x)<=map_.info.resolution) && (std::abs(mapREC.vec3d[j].y-depthCamera_points.vec3d[i].y)<=map_.info.resolution)){
 				found=true;
 				p_.x=div(depthCamera_points.vec3d[i].posIncloud,cv_ptr->image.cols).rem; //p_.x=depthCamera_points.vec3d[i].x;
 				p_.y=div(depthCamera_points.vec3d[i].posIncloud,cv_ptr->image.cols).quot;//p_.y=depthCamera_points.vec3d[i].y;
@@ -301,65 +307,28 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 				break;
 			}
 		}
+
 		float dist=sqrt(pow(pose_.position.x-depthCamera_points.vec3d[i].x,2)+pow(pose_.position.y-depthCamera_points.vec3d[i].y,2));
 
-		if(!found&&dist<=3){
+		if(!found && dist<=max_scan_dist){
 			p_.x=div(depthCamera_points.vec3d[i].posIncloud,cv_ptr->image.cols).rem; //p_.x=depthCamera_points.vec3d[i].x;
 			p_.y=div(depthCamera_points.vec3d[i].posIncloud,cv_ptr->image.cols).quot;//p_.y=depthCamera_points.vec3d[i].y;
 			p_.z=depthCamera_points.vec3d[i].z; //height category 
 			p_.posIncloud=depthCamera_points.vec3d[i].posIncloud;
-			new_v_.vec3d.push_back(p_);
-			p_.x=depthCamera_points.vec3d[i].x; //p_.x=depthCamera_points.vec3d[i].x;
-			p_.y=depthCamera_points.vec3d[i].y;//p_.y=depthCamera_points.vec3d[i].y;
-			som.vec3d.push_back(p_);
+			new_v_forImage.vec3d.push_back(p_);
+			p_.x=depthCamera_points.vec3d[i].x; 
+			p_.y=depthCamera_points.vec3d[i].y;
+			new_v_forSlam.vec3d.push_back(p_);
 		}
 	}
-
 	
-	// for (int i = 0; i < mapREC.vec3d.size(); ++i)
-	// {
-	// 	int loopbreak=0;bool found=false;
-	// 	for (int j = 0; j < depthCamera_points.vec3d.size(); ++j)
-	// 	{
-	// 		iters++;
-			
-	// 		if ((std::abs(mapREC.vec3d[i].x-depthCamera_points.vec3d[j].x)<=2*map_.info.resolution-0.1) && (std::abs(mapREC.vec3d[i].y-depthCamera_points.vec3d[j].y)<=2*map_.info.resolution-0.1)){
-	// 			//p_=depthCamera_points.vec3d[i];
-	// 			found=true;
-	// 			p_.x=div(depthCamera_points.vec3d[j].posIncloud,cv_ptr->image.cols).rem; //p_.x=depthCamera_points.vec3d[i].x;
-	// 			p_.y=div(depthCamera_points.vec3d[j].posIncloud,cv_ptr->image.cols).quot;//p_.y=depthCamera_points.vec3d[i].y;
-	// 			p_.z=depthCamera_points.vec3d[j].z; //height category 
-	// 			p_.posIncloud=depthCamera_points.vec3d[j].posIncloud;
-
-	// 			if(p_.z>max_z_point){
-	// 				max_z_point=p_.z;
-	// 			}
-
-	// 			matched_points_.vec3d.push_back(p_);
-	// 			loopbreak++;				
-	// 		}else{
-	// 			p_.x=div(depthCamera_points.vec3d[j].posIncloud,cv_ptr->image.cols).rem; //p_.x=depthCamera_points.vec3d[i].x;
-	// 			p_.y=div(depthCamera_points.vec3d[j].posIncloud,cv_ptr->image.cols).quot;//p_.y=depthCamera_points.vec3d[i].y;
-	// 			p_.z=depthCamera_points.vec3d[j].z; //height category 
-	// 			p_.posIncloud=depthCamera_points.vec3d[j].posIncloud;	
-	// 			new_v_.vec3d.push_back(p_);
-	// 		}
-
-	// 		if(loopbreak>thres){
-	// 			j=depthCamera_points.vec3d.size();
-	// 		}
-
-	// 	}
-
-
-	// }
-
-	ROS_INFO("Total %d matched, doing iters %d and found extra %d",matched_points_.vec3d.size(),iters,new_v_.vec3d.size());
+	ROS_INFO("Found extra %d ,total matched %d, doing iters %d",new_v_forImage.vec3d.size(),matched_points_.vec3d.size(),iters);
 
 	// // try
 	// //pcl::toROSMsg (pcl_out, image_); //in case we had a pointcloud..
 	// //cv_ptr = cv_bridge::toCvCopy(image_, sensor_msgs::image_encodings::BGR8);
       
+    //Colourize Matched points on Camera frame and post the new-founded points on cloudLIstener Node and then on Hector Slam  
 	cv::Mat image = cv_ptr->image; 
 	double alpha = 0.5;
 	for (int i = 0; i < matched_points_.vec3d.size(); ++i)
@@ -387,10 +356,10 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 		}
 	}
 	//colorize the new discovered 3d points-obstacles
-	for (int i = 0; i < new_v_.vec3d.size(); ++i)
+	for (int i = 0; i < new_v_forImage.vec3d.size(); ++i)
 	{
-		if(new_v_.vec3d[i].x>=0&&new_v_.vec3d[i].y>=0){
-			cv::Mat roi =  image(cv::Rect(new_v_.vec3d[i].x,new_v_.vec3d[i].y,1, 1));
+		if(new_v_forImage.vec3d[i].x>=0&&new_v_forImage.vec3d[i].y>=0){
+			cv::Mat roi =  image(cv::Rect(new_v_forImage.vec3d[i].x,new_v_forImage.vec3d[i].y,1, 1));
 			cv::Mat color(roi.size(), CV_8UC3, cv::Scalar(125, 0, 0)); 
 			cv::addWeighted(color, alpha, roi, 1.0 - alpha , 0.0, roi); 
 		}
@@ -400,22 +369,22 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
 	mapREC.vec3d.clear();
 
 	cv_bridge::CvImage out_msg;
-	out_msg.header   = msg->header; // Same timestamp and tf frame as input image
-	out_msg.encoding = sensor_msgs::image_encodings::BGR8; // Or whatever
-	out_msg.image    =  cv_ptr->image; // Your cv::Mat
+	out_msg.header   = msg->header; 
+	out_msg.encoding = sensor_msgs::image_encodings::BGR8; 
+	out_msg.image    =  cv_ptr->image; 
 
 	
 	img_pub.publish(out_msg.toImageMsg());
 	//cv::imshow( "Image window",  image);
 	//cv::waitKey(3);   
 
-/*	for (int i = 0; i < som.vec3d.size(); ++i)
+/*	for (int i = 0; i < new_v_forSlam.vec3d.size(); ++i)
 	{
-		//ROS_INFO("another one %f %f",new_v_.vec3d[i].x,new_v_.vec3d[i].y);
-		som.vec3d[i].x=ceil((som.vec3d[i].x+std::abs(map_.info.origin.position.x))*(1/map_.info.resolution));
-		som.vec3d[i].y=ceil((som.vec3d[i].y+std::abs(map_.info.origin.position.y))*(1/map_.info.resolution));
+		//ROS_INFO("another one %f %f",new_v_forImage.vec3d[i].x,new_v_forImage.vec3d[i].y);
+		new_v_forSlam.vec3d[i].x=ceil((new_v_forSlam.vec3d[i].x+std::abs(map_.info.origin.position.x))*(1/map_.info.resolution));
+		new_v_forSlam.vec3d[i].y=ceil((new_v_forSlam.vec3d[i].y+std::abs(map_.info.origin.position.y))*(1/map_.info.resolution));
 	}*/
-	depthmap_pub.publish(som);
+	depthmap_pub.publish(new_v_forSlam);
 
 }
 

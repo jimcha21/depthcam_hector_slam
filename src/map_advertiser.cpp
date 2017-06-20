@@ -28,7 +28,7 @@ int main(int argc, char** argv)
 		}
 		else
 		{
-			ROS_ERROR("Failed to fetch the map");
+			ROS_ERROR("Failed to fetch the map, please run HectorMappingRos node...");
 		}
   	}
 

@@ -437,7 +437,7 @@ int main(int argc, char** argv)
 	ros::init(argc, argv, "slammin_matcher");
 	ros::NodeHandle nh("~");
   	nh.getParam("max_scanned_depth", max_scanned_depth_);
-  	ROS_INFO("HEHE %f",max_scanned_depth_);
+  	
 	//subscribers
 	sub= nh.subscribe<slammin::pointVector3d> ("/slammin_pointVector3d", 1, vector_data);
 	pose_sub=nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("/poseupdate", 1, get_pose_);

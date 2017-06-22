@@ -149,7 +149,7 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "cloudlistener_toMap");
   ros::NodeHandle nh("~");
   nh.getParam("min_scanned_height", min_scanned_height_);
-  ROS_INFO("HEHE %f",min_scanned_height_);
+  
   tf_listener    = new tf::TransformListener();
 
   sub= nh.subscribe<PointCloud>("/camera/depth/points", 1, callback);

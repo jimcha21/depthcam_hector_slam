@@ -1,5 +1,3 @@
-# slammin
-
 ## Installation
 
 Download [Hector SLAM](https://github.com/tu-darmstadt-ros-pkg/hector_slam) ROS package,

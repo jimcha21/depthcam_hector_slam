@@ -20,4 +20,4 @@ $ catkin_make install
 
 Todo-> Add launch files, Add Gazebo simulated world
 
-![GitHub Logo](screenshot.png)
+![GitHub Logo](131.png)

@@ -1,3 +1,5 @@
+![GitHub Logo](131.png)
+
 ## Installation
 
 Download [Hector SLAM](https://github.com/tu-darmstadt-ros-pkg/hector_slam) ROS package,
@@ -19,5 +21,3 @@ $ catkin_make install
 ```
 
 Todo-> Add launch files, Add Gazebo simulated world
-
-![GitHub Logo](131.png)
